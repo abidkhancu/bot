@@ -2,8 +2,9 @@
 Crypto Futures Signal Analysis Bot – Main entry point.
 
 Usage:
-    python -m crypto_signal_bot.main          # Run once
-    python -m crypto_signal_bot.main --loop   # Run every RUN_INTERVAL_MINUTES
+    python -m crypto_signal_bot.main                        # Run once, console output
+    python -m crypto_signal_bot.main --loop                 # Run every RUN_INTERVAL_MINUTES
+    python -m crypto_signal_bot.main --export-json out.json # Write signals as JSON
 
 No trading is executed.  Signals are printed to the console and logged.
 """
@@ -11,7 +12,10 @@ No trading is executed.  Signals are printed to the console and logged.
 from __future__ import annotations
 
 import argparse
+import json
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 
@@ -164,6 +168,36 @@ def print_signal(result: dict) -> None:
     print("\n".join(lines))
 
 
+def export_json(results: list[dict], path: str) -> None:
+    """Write signal results to a JSON file for the GitHub Pages dashboard.
+
+    Args:
+        results: List of signal result dicts produced by :func:`run_analysis`.
+        path:    Destination file path.
+    """
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "signals": [_serialise(r) for r in results if r],
+    }
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    logger.info("Signals exported to %s", path)
+
+
+def _serialise(result: dict) -> dict:
+    """Return a JSON-serialisable copy of a result dict."""
+    safe: dict = {}
+    for k, v in result.items():
+        if isinstance(v, float) and (v != v):  # NaN check
+            safe[k] = None
+        elif isinstance(v, dict):
+            safe[k] = _serialise(v)
+        else:
+            safe[k] = v
+    return safe
+
+
 def _fmt(value) -> str:
     """Format a float value to 2 decimal places, or 'N/A' if unavailable."""
     try:
@@ -177,23 +211,30 @@ def _fmt(value) -> str:
 # ---------------------------------------------------------------------------
 
 
-def main(loop: bool = False) -> None:
+def main(loop: bool = False, export_json_path: str | None = None) -> None:
     """Run the signal bot.
 
     Args:
-        loop: When True, repeat every ``RUN_INTERVAL_MINUTES`` minutes.
+        loop:             When True, repeat every ``RUN_INTERVAL_MINUTES`` minutes.
+        export_json_path: When set, write all signal results to this JSON file.
     """
     logger.info("Crypto Futures Signal Bot started.")
     logger.info("Pairs: %s | Timeframes: %s", PAIRS, TIMEFRAMES)
 
     while True:
+        results: list[dict] = []
         for pair in PAIRS:
             for tf in TIMEFRAMES:
                 try:
                     result = run_analysis(pair, tf)
                     print_signal(result)
+                    if result:
+                        results.append(result)
                 except Exception:  # noqa: BLE001
                     logger.exception("Error analysing %s %s", pair, tf)
+
+        if export_json_path:
+            export_json(results, export_json_path)
 
         if not loop:
             break
@@ -213,5 +254,11 @@ if __name__ == "__main__":
         action="store_true",
         help=f"Run continuously every {RUN_INTERVAL_MINUTES} minutes.",
     )
+    parser.add_argument(
+        "--export-json",
+        metavar="PATH",
+        default=None,
+        help="Write signal results to a JSON file (for the GitHub Pages dashboard).",
+    )
     args = parser.parse_args()
-    main(loop=args.loop)
+    main(loop=args.loop, export_json_path=args.export_json)

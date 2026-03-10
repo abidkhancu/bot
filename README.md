@@ -4,6 +4,9 @@ A modular Python project that analyses cryptocurrency markets and outputs tradin
 
 > **No trades are executed. No Binance API is required.**
 
+📊 **Live Dashboard (GitHub Pages):** signals are automatically published every 30 minutes via GitHub Actions.
+> Enable GitHub Pages in your repo settings (Settings → Pages → Source: **GitHub Actions**) to activate the dashboard.
+
 ---
 
 ## Features
@@ -16,6 +19,7 @@ A modular Python project that analyses cryptocurrency markets and outputs tradin
 - Support & resistance zones from swing highs/lows
 - Scoring-based signal engine: LONG / SHORT / NO TRADE
 - Risk management: ATR-based stop loss & take profit (default 1:3 RR)
+- **GitHub Pages dashboard** – live signal cards, auto-refreshes every 5 minutes
 
 ---
 
@@ -107,7 +111,47 @@ python -m crypto_signal_bot.main
 python -m crypto_signal_bot.main --loop
 ```
 
-### Example output
+### Export signals as JSON (for the GitHub Pages dashboard)
+
+```bash
+python -m crypto_signal_bot.main --export-json docs/signals.json
+```
+
+---
+
+## GitHub Pages Dashboard
+
+The repository includes a `.github/workflows/pages.yml` workflow that:
+
+1. Installs Python dependencies
+2. Runs the bot and saves signals to `docs/signals.json`
+3. Deploys the `docs/` folder to GitHub Pages
+
+### Enable it in your fork
+
+1. Go to **Settings → Pages**
+2. Set **Source** to **GitHub Actions**
+3. Push to the default branch or trigger the workflow manually from the **Actions** tab
+
+The dashboard will be available at:
+```
+https://<your-username>.github.io/<your-repo>/
+```
+
+It auto-refreshes every 5 minutes in the browser and is redeployed by CI every 30 minutes.
+
+### Dashboard features
+
+- Signal cards for each pair/timeframe combination
+- Color-coded badges: 🟢 LONG · 🔴 SHORT · ⚪ No Trade
+- Entry, Stop Loss, Take Profit prices
+- RSI, trend, candlestick pattern, volume info
+- Confidence bar and score breakdown
+- Support / resistance levels
+- Filter chips (All / Long / Short / No Trade)
+- Dark theme optimised for trading dashboards
+
+
 
 ```
 ============================================================
