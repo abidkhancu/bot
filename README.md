@@ -19,6 +19,7 @@ A modular Python project that analyses cryptocurrency markets and outputs tradin
 - Support & resistance zones from swing highs/lows
 - Scoring-based signal engine: LONG / SHORT / NO TRADE
 - Risk management: ATR-based stop loss & take profit (default 1:3 RR)
+- **Interactive Web UI** – real-time coin selector, multi-timeframe analysis, auto-refresh
 - **GitHub Pages dashboard** – live signal cards, auto-refreshes every 5 minutes
 
 ---
@@ -28,7 +29,7 @@ A modular Python project that analyses cryptocurrency markets and outputs tradin
 ```
 crypto_signal_bot/
 ├── config/
-│   └── settings.py          # Configuration (env vars + defaults)
+│   └── settings.py          # Configuration (env vars + defaults, full coin catalogue)
 ├── data/
 │   └── data_fetcher.py      # OHLCV data from public APIs
 ├── analysis/
@@ -42,7 +43,8 @@ crypto_signal_bot/
 │   └── risk_management.py    # Entry, SL, TP, RR calculation
 ├── utils/
 │   └── logger.py             # Logging utility
-└── main.py                   # Entry point
+├── main.py                   # CLI entry point
+└── webui.py                  # Interactive Web UI (Flask server)
 ```
 
 ---
@@ -99,13 +101,40 @@ cp .env.example .env
 
 ## Usage
 
-### Run once
+### Interactive Web UI (recommended)
+
+Start the local Flask server:
+
+```bash
+python -m crypto_signal_bot.webui
+```
+
+Then open **http://localhost:5000/** in your browser.
+
+Features:
+- Searchable dropdown of **30+ popular crypto pairs** (BTC, ETH, SOL, BNB, XRP, ADA, AVAX, …)
+- Timeframe tabs: **1m · 5m · 15m · 30m · 1h · 4h · 1d** – select one or many
+- **⚡ Analyse** button – runs the full signal pipeline live on demand
+- **Auto-refresh** – rerun analysis automatically every 30 s / 1 min / 5 min / 15 min
+- Signal type filter: All / Long / Short / No Trade
+- Color-coded signal cards with entry, SL, TP, confidence bar, score breakdown
+
+Options:
+
+```bash
+python -m crypto_signal_bot.webui --host 0.0.0.0 --port 8080   # expose on LAN
+python -m crypto_signal_bot.webui --debug                        # Flask debug mode
+```
+
+---
+
+### CLI – Run once
 
 ```bash
 python -m crypto_signal_bot.main
 ```
 
-### Run continuously (every `RUN_INTERVAL_MINUTES` minutes)
+### CLI – Run continuously (every `RUN_INTERVAL_MINUTES` minutes)
 
 ```bash
 python -m crypto_signal_bot.main --loop

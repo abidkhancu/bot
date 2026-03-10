@@ -16,8 +16,56 @@ PAIRS: list[str] = os.getenv(
 ).split(",")
 
 TIMEFRAMES: list[str] = os.getenv(
-    "TIMEFRAMES", "15m,1h,4h"
+    "TIMEFRAMES", "1m,5m,15m,1h,4h"
 ).split(",")
+
+# ---------------------------------------------------------------------------
+# Full catalogue of supported pairs (used by the interactive Web UI)
+# ---------------------------------------------------------------------------
+ALL_PAIRS: list[str] = [
+    # Layer-1 / large caps
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+    "XRP/USDT",
+    "ADA/USDT",
+    "AVAX/USDT",
+    "DOT/USDT",
+    "MATIC/USDT",
+    "LINK/USDT",
+    # Mid caps / DeFi
+    "DOGE/USDT",
+    "LTC/USDT",
+    "BCH/USDT",
+    "UNI/USDT",
+    "ATOM/USDT",
+    "FTM/USDT",
+    "NEAR/USDT",
+    "APT/USDT",
+    "ARB/USDT",
+    "OP/USDT",
+    # Meme coins
+    "SHIB/USDT",
+    "PEPE/USDT",
+    "FLOKI/USDT",
+    # Other popular futures
+    "TRX/USDT",
+    "TON/USDT",
+    "SUI/USDT",
+    "SEI/USDT",
+    "INJ/USDT",
+    "TIA/USDT",
+    "WLD/USDT",
+    "JUP/USDT",
+    "WIF/USDT",
+    "BONK/USDT",
+]
+
+# ---------------------------------------------------------------------------
+# All supported timeframes (used by the interactive Web UI)
+# ---------------------------------------------------------------------------
+ALL_TIMEFRAMES: list[str] = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
 
 # ---------------------------------------------------------------------------
 # Data source

@@ -50,13 +50,15 @@
 
     /* ── Filter bar ── */
     .filter-bar {
-      padding: 1rem 2rem;
+      padding: 0.75rem 2rem;
       display: flex;
       gap: 0.5rem;
       flex-wrap: wrap;
       align-items: center;
+      border-bottom: 1px solid var(--border);
     }
     .filter-label { font-size: 0.8rem; color: var(--muted); margin-right: 0.25rem; }
+    .filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 0.25rem; }
     .chip {
       padding: 0.3rem 0.85rem;
       border-radius: 99px;
@@ -286,10 +288,20 @@
   <!-- filter chips -->
   <div class="filter-bar" id="filter-bar">
     <span class="filter-label">Signal:</span>
-    <button class="chip active" data-filter="ALL">All</button>
-    <button class="chip" data-filter="LONG">🟢 Long</button>
-    <button class="chip" data-filter="SHORT">🔴 Short</button>
-    <button class="chip" data-filter="NO TRADE">⚪ No Trade</button>
+    <button class="chip active" data-filter-type="signal" data-filter="ALL">All</button>
+    <button class="chip" data-filter-type="signal" data-filter="LONG">🟢 Long</button>
+    <button class="chip" data-filter-type="signal" data-filter="SHORT">🔴 Short</button>
+    <button class="chip" data-filter-type="signal" data-filter="NO TRADE">⚪ No Trade</button>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Timeframe:</span>
+    <button class="chip active" data-filter-type="tf" data-filter="ALL">All</button>
+    <button class="chip" data-filter-type="tf" data-filter="1m">1m</button>
+    <button class="chip" data-filter-type="tf" data-filter="5m">5m</button>
+    <button class="chip" data-filter-type="tf" data-filter="15m">15m</button>
+    <button class="chip" data-filter-type="tf" data-filter="30m">30m</button>
+    <button class="chip" data-filter-type="tf" data-filter="1h">1h</button>
+    <button class="chip" data-filter-type="tf" data-filter="4h">4h</button>
+    <button class="chip" data-filter-type="tf" data-filter="1d">1d</button>
   </div>
 
   <!-- cards grid -->
@@ -300,6 +312,7 @@
   // ── State ──────────────────────────────────────────────────────────────────
   let allSignals = [];
   let activeFilter = 'ALL';
+  let activeTfFilter = 'ALL';
 
   // ── Fetch data ─────────────────────────────────────────────────────────────
   async function loadSignals() {
@@ -324,9 +337,9 @@
 
   // ── Render ─────────────────────────────────────────────────────────────────
   function render() {
-    const signals = activeFilter === 'ALL'
-      ? allSignals
-      : allSignals.filter(s => s.signal === activeFilter);
+    let signals = allSignals;
+    if (activeFilter !== 'ALL') signals = signals.filter(s => s.signal === activeFilter);
+    if (activeTfFilter !== 'ALL') signals = signals.filter(s => s.timeframe === activeTfFilter);
 
     renderSummary();
     renderGrid(signals);
@@ -450,8 +463,14 @@
   document.getElementById('filter-bar').addEventListener('click', e => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
-    activeFilter = chip.dataset.filter;
-    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    const type = chip.dataset.filterType;
+    if (type === 'signal') {
+      activeFilter = chip.dataset.filter;
+      document.querySelectorAll('[data-filter-type="signal"]').forEach(c => c.classList.remove('active'));
+    } else if (type === 'tf') {
+      activeTfFilter = chip.dataset.filter;
+      document.querySelectorAll('[data-filter-type="tf"]').forEach(c => c.classList.remove('active'));
+    }
     chip.classList.add('active');
     render();
   });
