@@ -17,8 +17,10 @@ A modular Python project that analyses cryptocurrency markets and outputs tradin
 - Market structure: trend classification, Break of Structure (BOS), Change of Character (CHOCH)
 - Candlestick pattern recognition: Doji, Hammer, Shooting Star, Pin Bar, Engulfing patterns
 - Support & resistance zones from swing highs/lows
-- Scoring-based signal engine: LONG / SHORT / NO TRADE
-- Risk management: ATR-based stop loss & take profit (default 1:3 RR)
+- **Scoring-based signal engine**: LONG / SHORT / NO TRADE with strength tiers (STRONG LONG / LONG / STRONG SHORT / SHORT)
+  - Ichimoku Cloud position, Golden/Death cross, MACD position, extended RSI bands
+- **Risk management**: 1.5× ATR stop loss, three take-profit levels (TP1 1:1 / TP2 1:2 / TP3 1:3), percentage distances
+- **93 supported pairs**: BTC, ETH, SOL, BNB, XRP, ADA, AVAX, DOGE, PEPE, WIF, FET, TAO, AXS, ARB, OP, LDO, GMX, PENDLE, and many more
 - **Interactive Web UI** – real-time coin selector, multi-timeframe analysis, auto-refresh
 - **GitHub Pages dashboard** – live signal cards, auto-refreshes every 5 minutes
 
@@ -90,8 +92,8 @@ cp .env.example .env
 | `DATA_SOURCE`          | `cryptocompare`                | `cryptocompare` or `coingecko`           |
 | `CRYPTOCOMPARE_API_KEY`| _(empty)_                      | Optional – increases rate limits         |
 | `CANDLE_LIMIT`         | `200`                          | Number of candles per request            |
-| `LONG_THRESHOLD`       | `6`                            | Minimum score to generate a LONG signal  |
-| `SHORT_THRESHOLD`      | `-6`                           | Maximum score to generate a SHORT signal |
+| `LONG_THRESHOLD`       | `5`                            | Minimum score to generate a LONG signal  |
+| `SHORT_THRESHOLD`      | `-5`                           | Maximum score to generate a SHORT signal |
 | `RISK_REWARD_RATIO`    | `3.0`                          | Take profit = SL distance × ratio        |
 | `RUN_INTERVAL_MINUTES` | `15`                           | Minutes between runs in loop mode        |
 | `LOG_LEVEL`            | `INFO`                         | Logging level                            |
@@ -215,11 +217,17 @@ It auto-refreshes every 5 minutes in the browser and is redeployed by CI every 3
 | Condition                         | Score  |
 |-----------------------------------|--------|
 | RSI < 30 (oversold)               | +2     |
+| RSI 30-45 (mild oversold)         | +1     |
+| RSI 55-70 (mild overbought)       | −1     |
 | RSI > 70 (overbought)             | −2     |
 | EMA 9 crosses above EMA 21        | +2     |
 | EMA 9 crosses below EMA 21        | −2     |
+| Golden cross (EMA50 > SMA200)     | +2     |
+| Death cross  (EMA50 < SMA200)     | −2     |
 | MACD bullish crossover            | +1     |
 | MACD bearish crossover            | −1     |
+| MACD positive (bullish momentum)  | +1     |
+| MACD negative (bearish momentum)  | −1     |
 | Bullish candlestick pattern       | +3     |
 | Bearish candlestick pattern       | −3     |
 | Volume spike                      | +1     |
@@ -231,11 +239,13 @@ It auto-refreshes every 5 minutes in the browser and is redeployed by CI every 3
 | Price below VWAP                  | −1     |
 | Price outside Bollinger Band      | ±1     |
 | Stochastic oversold/overbought    | ±1     |
+| Price above Ichimoku cloud        | +2     |
+| Price below Ichimoku cloud        | −2     |
 
-**Decision:**
-- Score ≥ 6 → **LONG**
-- Score ≤ −6 → **SHORT**
-- Otherwise → **NO TRADE**
+**Decision (max possible score: ±26):**
+- Score ≥ 5  → **LONG** (score ≥ 10 = **STRONG LONG**)
+- Score ≤ −5 → **SHORT** (score ≤ −10 = **STRONG SHORT**)
+- Otherwise  → **NO TRADE**
 
 ---
 

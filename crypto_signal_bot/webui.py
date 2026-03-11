@@ -326,6 +326,80 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
     .score-pos   { background: rgba(63,185,80,0.12); color: var(--long); }
     .score-neg   { background: rgba(248,81,73,0.12); color: var(--short); }
 
+    /* ── Trade-setup box ── */
+    .trade-setup {
+      border-top: 1px solid var(--border);
+      padding: 0.65rem 1rem 0.75rem;
+      display: flex; flex-direction: column; gap: 0.35rem;
+    }
+    .setup-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.82rem;
+    }
+    .setup-label {
+      font-size: 0.7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--muted);
+      display: flex; align-items: center; gap: 0.35rem;
+    }
+    .rr-annotation { opacity: 0.6; }
+    .no-signal-note { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
+    .flex-row-gap { display: flex; align-items: center; gap: 0.4rem; }
+    .setup-price {
+      font-weight: 700; font-size: 0.9rem;
+      display: flex; align-items: baseline; gap: 0.3rem;
+    }
+    .setup-pct {
+      font-size: 0.7rem; font-weight: 600;
+      padding: 0.1rem 0.4rem; border-radius: 4px;
+    }
+    .row-entry  .setup-price { color: var(--accent); }
+    .row-sl     .setup-price { color: var(--short); }
+    .row-sl     .setup-pct  { background: rgba(248,81,73,0.15); color: var(--short); }
+    .row-tp1    .setup-price { color: #58d68d; }
+    .row-tp1    .setup-pct  { background: rgba(63,185,80,0.12); color: var(--long); }
+    .row-tp2    .setup-price { color: #2ecc71; }
+    .row-tp2    .setup-pct  { background: rgba(63,185,80,0.18); color: var(--long); }
+    .row-tp3    .setup-price { color: var(--long); }
+    .row-tp3    .setup-pct  { background: rgba(63,185,80,0.25); color: var(--long); }
+    .setup-divider {
+      font-size: 0.62rem; color: var(--muted); text-align: center;
+      border-top: 1px dashed var(--border); margin: 0.25rem 0 0;
+      padding-top: 0.35rem; letter-spacing: 0.05em;
+    }
+
+    /* ── Signal banner (replaces old badge) ── */
+    .signal-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .signal-main {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 1.2rem; font-weight: 800; letter-spacing: 0.03em;
+    }
+    .signal-tag {
+      font-size: 0.62rem; font-weight: 700;
+      padding: 0.2rem 0.55rem; border-radius: 4px;
+      letter-spacing: 0.07em; text-transform: uppercase;
+    }
+    .banner-LONG    { background: rgba(63,185,80,0.08); }
+    .banner-SHORT   { background: rgba(248,81,73,0.08); }
+    .banner-NOTRADE { background: transparent; }
+    .color-LONG    { color: var(--long); }
+    .color-SHORT   { color: var(--short); }
+    .color-NOTRADE { color: var(--notrade); }
+    .tag-bg-LONG    { background: rgba(63,185,80,0.15); }
+    .tag-bg-SHORT   { background: rgba(248,81,73,0.15); }
+    .tag-bg-NOTRADE { background: rgba(139,148,158,0.12); }
+    .rr-badge {
+      font-size: 0.7rem; font-weight: 700;
+      padding: 0.25rem 0.6rem; border-radius: 99px;
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+      border: 1px solid rgba(88,166,255,0.25);
+    }
+
     /* ── Skeleton / Loading ── */
     .skeleton-card {
       background: var(--surface);
@@ -656,33 +730,82 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
 
   // ── Card builder ───────────────────────────────────────────────────────────
   function buildCard(s) {
-    const signal   = s.signal || 'NO TRADE';
-    const badgeCls = signal === 'NO TRADE' ? 'NOTRADE' : signal;
-    const emoji    = { LONG: '🟢', SHORT: '🔴', 'NO TRADE': '⚪' }[signal] || '';
-    const confClr  = signal === 'LONG' ? '#3fb950' : signal === 'SHORT' ? '#f85149' : '#8b949e';
+    const signal    = s.signal || 'NO TRADE';
+    const strength  = s.signal_strength || signal;
+    const cls       = signal === 'NO TRADE' ? 'NOTRADE' : signal;
+    const emoji     = { LONG: '🟢', SHORT: '🔴', 'NO TRADE': '⚪' }[signal] || '';
+    const confClr   = signal === 'LONG' ? '#3fb950' : signal === 'SHORT' ? '#f85149' : '#8b949e';
 
-    const priceRow = s.stop_loss != null ? `
-      <div class="prices">
-        <div class="price-block">
-          <div class="price-label">Entry</div>
-          <div class="price-value entry">${fmt(s.entry)}</div>
+    // ── Signal banner ──────────────────────────────────────────────────────
+    const rrBadge = s.rr_ratio != null
+      ? `<span class="rr-badge">RR 1:${s.rr_ratio}</span>` : '';
+    const banner = `
+      <div class="signal-banner banner-${cls}">
+        <div class="signal-main color-${cls}">
+          <span>${emoji}</span>
+          <span>${strength}</span>
         </div>
-        <div class="price-block">
-          <div class="price-label">Stop Loss</div>
-          <div class="price-value sl">${fmt(s.stop_loss)}</div>
+        <div class="flex-row-gap">
+          <span class="signal-tag tag-bg-${cls} color-${cls}">Score ${s.score > 0 ? '+' : ''}${s.score}</span>
+          ${rrBadge}
         </div>
-        <div class="price-block">
-          <div class="price-label">Take Profit</div>
-          <div class="price-value tp">${fmt(s.take_profit)}</div>
-        </div>
-      </div>` : (s.entry != null ? `
-      <div class="prices">
-        <div class="price-block" style="grid-column:1/-1">
-          <div class="price-label">Current Price</div>
-          <div class="price-value entry">${fmt(s.entry)}</div>
-        </div>
-      </div>` : '');
+      </div>`;
 
+    // ── Trade-setup box ────────────────────────────────────────────────────
+    let tradeSetup = '';
+    if (s.stop_loss != null) {
+      const dirArrow = signal === 'LONG' ? '▲' : '▼';
+      tradeSetup = `
+        <div class="trade-setup">
+          <div class="setup-row row-entry">
+            <span class="setup-label">📍 Entry</span>
+            <span class="setup-price">${fmtP(s.entry)}</span>
+          </div>
+          <div class="setup-row row-sl">
+            <span class="setup-label">🛑 Stop Loss</span>
+            <span class="setup-price">
+              ${fmtP(s.stop_loss)}
+              ${s.sl_pct != null ? `<span class="setup-pct">-${s.sl_pct}%</span>` : ''}
+            </span>
+          </div>
+          <div class="setup-divider">── Take Profit Targets ──</div>
+          ${s.tp1 != null ? `
+          <div class="setup-row row-tp1">
+            <span class="setup-label">🎯 TP1 &nbsp;<small class="rr-annotation">(1:1)</small></span>
+            <span class="setup-price">
+              ${fmtP(s.tp1)}
+              ${s.tp1_pct != null ? `<span class="setup-pct">+${s.tp1_pct}%</span>` : ''}
+            </span>
+          </div>` : ''}
+          ${s.tp2 != null ? `
+          <div class="setup-row row-tp2">
+            <span class="setup-label">🎯 TP2 &nbsp;<small class="rr-annotation">(1:2)</small></span>
+            <span class="setup-price">
+              ${fmtP(s.tp2)}
+              ${s.tp2_pct != null ? `<span class="setup-pct">+${s.tp2_pct}%</span>` : ''}
+            </span>
+          </div>` : ''}
+          ${s.tp3 != null ? `
+          <div class="setup-row row-tp3">
+            <span class="setup-label">🎯 TP3 &nbsp;<small class="rr-annotation">(1:3)</small></span>
+            <span class="setup-price">
+              ${fmtP(s.tp3)}
+              ${s.tp3_pct != null ? `<span class="setup-pct">+${s.tp3_pct}%</span>` : ''}
+            </span>
+          </div>` : ''}
+        </div>`;
+    } else if (s.entry != null) {
+      tradeSetup = `
+        <div class="trade-setup">
+          <div class="setup-row row-entry">
+            <span class="setup-label">📍 Current Price</span>
+            <span class="setup-price">${fmtP(s.entry)}</span>
+          </div>
+          <div class="no-signal-note">No trade signal – waiting for confirmation</div>
+        </div>`;
+    }
+
+    // ── Stats grid ─────────────────────────────────────────────────────────
     const trendCls = `trend-${(s.trend || 'RANGE').replace(/\s/g, '_')}`;
     const volLabel = s.vol_spike ? '🔥 Spike' : (s.vol_trend || 'flat');
     const stats = `
@@ -695,28 +818,26 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
         <div class="stat"><div class="stat-label">CHOCH</div><div class="stat-value">${s.choch ? '⚠️ Yes' : 'No'}</div></div>
       </div>`;
 
+    // ── S/R ────────────────────────────────────────────────────────────────
     const res   = ((s.sr_levels && s.sr_levels.resistance) || []).slice(0, 3);
     const sup   = ((s.sr_levels && s.sr_levels.support)    || []).slice(0, 3);
     const srRow = (res.length || sup.length) ? `
       <div class="sr-row">
-        ${res.length ? `<div class="sr-group"><div class="sr-title">Resistance</div>${res.map(r => `<div class="sr-val res">${fmt(r)}</div>`).join('')}</div>` : ''}
-        ${sup.length ? `<div class="sr-group"><div class="sr-title">Support</div>${sup.map(r => `<div class="sr-val sup">${fmt(r)}</div>`).join('')}</div>` : ''}
+        ${res.length ? `<div class="sr-group"><div class="sr-title">Resistance</div>${res.map(r => `<div class="sr-val res">${fmtP(r)}</div>`).join('')}</div>` : ''}
+        ${sup.length ? `<div class="sr-group"><div class="sr-title">Support</div>${sup.map(r => `<div class="sr-val sup">${fmtP(r)}</div>`).join('')}</div>` : ''}
       </div>` : '';
 
+    // ── Score breakdown ─────────────────────────────────────────────────────
     const details   = s.signal_details || {};
     const scoreItems = Object.entries(details).map(([k, v]) => {
-      const cls = v > 0 ? 'score-pos' : 'score-neg';
-      return `<span class="score-item ${cls}">${v > 0 ? '+' : ''}${v} ${k}</span>`;
+      const c = v > 0 ? 'score-pos' : 'score-neg';
+      return `<span class="score-item ${c}">${v > 0 ? '+' : ''}${v} ${k}</span>`;
     }).join('');
     const scoreRow = scoreItems ? `
       <div class="score-details">
-        <div class="score-title">Score breakdown (total: ${s.score > 0 ? '+' : ''}${s.score})</div>
+        <div class="score-title">Signal factors (score: ${s.score > 0 ? '+' : ''}${s.score})</div>
         <div class="score-items">${scoreItems}</div>
       </div>` : '';
-
-    const rrLabel = s.rr_ratio != null
-      ? `<span style="font-size:0.7rem;color:var(--muted);margin-left:0.5rem">RR 1:${s.rr_ratio}</span>`
-      : '';
 
     return `
     <div class="card" data-signal="${signal}">
@@ -724,14 +845,12 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
         <span class="pair-name">${s.pair}</span>
         <span class="timeframe-badge">${s.timeframe}</span>
       </div>
-      <div style="padding:0.2rem 1rem 0">
-        <span class="signal-badge ${badgeCls}">${emoji} ${signal}</span>${rrLabel}
-      </div>
-      ${priceRow}
+      ${banner}
+      ${tradeSetup}
       ${stats}
       <div class="confidence-row">
         <div class="conf-header">
-          <span class="conf-label">Confidence</span>
+          <span class="conf-label">Signal Confidence</span>
           <span class="conf-pct" style="color:${confClr}">${s.confidence}%</span>
         </div>
         <div class="conf-bar-bg">
@@ -758,6 +877,16 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
     if (v == null) return '—';
     const n = parseFloat(v);
     return isNaN(n) ? v : n.toLocaleString(undefined, { maximumFractionDigits: 6 });
+  }
+  // Price formatter: auto-selects decimal places based on magnitude
+  function fmtP(v) {
+    if (v == null) return '—';
+    const n = parseFloat(v);
+    if (isNaN(n)) return v;
+    if (n >= 1000)  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (n >= 1)     return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    if (n >= 0.01)  return n.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+    return n.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 8 });
   }
   function fmtNow() {
     return new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });

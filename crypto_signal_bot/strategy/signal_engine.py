@@ -6,30 +6,44 @@ weighted scoring system.
 
 Scoring rules
 -------------
-Indicator                    | Bullish | Bearish
------------------------------|---------|--------
-RSI < 30 (oversold)          | +2      | –
-RSI > 70 (overbought)        | –       | -2
-EMA crossover (9 > 21)       | +2      | –
-EMA crossover (9 < 21)       | –       | -2
-MACD crossover (bullish)     | +1      | –
-MACD crossover (bearish)     | –       | -1
-Bullish candlestick pattern  | +3      | –
-Bearish candlestick pattern  | –       | -3
-Volume spike                 | +1      | –
-Market structure UPTREND     | +2      | –
-Market structure DOWNTREND   | –       | -2
-BOS in trend direction       | +1      | -1
-CHOCH (reversal signal)      | +/-1    | +/-1
-Price above VWAP             | +1      | –
-Price below VWAP             | –       | -1
-BB squeeze breakout (bullish)| +1      | –
-BB squeeze breakout (bearish)| –       | -1
+Indicator                         | Bullish | Bearish
+----------------------------------|---------|--------
+RSI < 30 (oversold)               | +2      | –
+RSI > 70 (overbought)             | –       | -2
+RSI 30-45 (mild oversold)         | +1      | –
+RSI 55-70 (mild overbought)       | –       | -1
+EMA crossover (9 > 21)            | +2      | –
+EMA crossover (9 < 21)            | –       | -2
+Golden cross (EMA50 > SMA200)     | +2      | –
+Death cross  (EMA50 < SMA200)     | –       | -2
+MACD crossover (bullish)          | +1      | –
+MACD crossover (bearish)          | –       | -1
+MACD position positive            | +1      | –
+MACD position negative            | –       | -1
+Bullish candlestick pattern       | +3      | –
+Bearish candlestick pattern       | –       | -3
+Volume spike                      | +1      | –
+Market structure UPTREND          | +2      | –
+Market structure DOWNTREND        | –       | -2
+BOS in trend direction            | +1      | -1
+CHOCH (reversal signal)           | +/-1    | +/-1
+Price above VWAP                  | +1      | –
+Price below VWAP                  | –       | -1
+BB position (outside band)        | +/-1    | +/-1
+Stochastic oversold/overbought    | +1      | -1
+Ichimoku: price above cloud       | +2      | –
+Ichimoku: price below cloud       | –       | -2
 
 Decision thresholds (configurable via settings):
-    score >=  LONG_THRESHOLD  → LONG
-    score <= SHORT_THRESHOLD  → SHORT
+    score >=  LONG_THRESHOLD  → LONG   (default: 5)
+    score <= SHORT_THRESHOLD  → SHORT  (default: -5)
     otherwise                 → NO TRADE
+
+Signal strength tiers:
+    LONG  score ≥ 10 → STRONG LONG
+    LONG  score  5-9 → LONG
+    SHORT score ≤-10 → STRONG SHORT
+    SHORT score -5–-9→ SHORT
 """
 
 from __future__ import annotations
@@ -68,17 +82,23 @@ def generate_signal(df: pd.DataFrame) -> dict:
 
     Returns:
         Dictionary with keys:
-            signal      – 'LONG', 'SHORT', or 'NO TRADE'
-            score       – total raw score
-            confidence  – score-based confidence percentage (0-100)
-            details     – dict of individual score contributions
+            signal         – 'LONG', 'SHORT', or 'NO TRADE'
+            signal_strength– human-readable strength label
+            score          – total raw score
+            confidence     – score-based confidence percentage (0-100)
+            details        – dict of individual score contributions
     """
     if df.empty or len(df) < 2:
         logger.warning("Signal engine: insufficient data.")
-        return {"signal": "NO TRADE", "score": 0, "confidence": 0, "details": {}}
+        return {
+            "signal": "NO TRADE",
+            "signal_strength": "NO TRADE",
+            "score": 0,
+            "confidence": 0,
+            "details": {},
+        }
 
     last = df.iloc[-1]
-    score = 0
     details: dict[str, int] = {}
 
     # ------------------------------------------------------------------
@@ -87,24 +107,40 @@ def generate_signal(df: pd.DataFrame) -> dict:
     rsi = _get(last, "rsi")
     if rsi is not None:
         if rsi < 30:
-            _add(details, "RSI oversold", 2)
+            _add(details, "RSI oversold (<30)", 2)
         elif rsi > 70:
-            _add(details, "RSI overbought", -2)
+            _add(details, "RSI overbought (>70)", -2)
+        elif rsi < 45:
+            _add(details, "RSI mild oversold (30-45)", 1)
+        elif rsi > 55:
+            _add(details, "RSI mild overbought (55-70)", -1)
 
     # ------------------------------------------------------------------
-    # EMA crossover (short EMA vs medium EMA)
+    # EMA crossover (EMA9 vs EMA21)
     # ------------------------------------------------------------------
     ema9 = _get(last, "ema_9")
     ema21 = _get(last, "ema_21")
     if ema9 is not None and ema21 is not None:
         if ema9 > ema21:
-            _add(details, "EMA crossover bullish", 2)
+            _add(details, "EMA9 > EMA21 (bullish cross)", 2)
         else:
-            _add(details, "EMA crossover bearish", -2)
+            _add(details, "EMA9 < EMA21 (bearish cross)", -2)
 
     # ------------------------------------------------------------------
-    # MACD histogram
+    # Golden / Death cross (EMA50 vs SMA200)
     # ------------------------------------------------------------------
+    ema50 = _get(last, "ema_50")
+    sma200 = _get(last, "sma_200")
+    if ema50 is not None and sma200 is not None:
+        if ema50 > sma200:
+            _add(details, "Golden cross (EMA50 > SMA200)", 2)
+        else:
+            _add(details, "Death cross (EMA50 < SMA200)", -2)
+
+    # ------------------------------------------------------------------
+    # MACD – crossover AND position
+    # ------------------------------------------------------------------
+    macd_val = _get(last, "macd")
     macd_hist = _get(last, "macd_hist")
     if macd_hist is not None:
         prev_hist = _get(df.iloc[-2], "macd_hist") if len(df) > 1 else None
@@ -113,6 +149,11 @@ def generate_signal(df: pd.DataFrame) -> dict:
                 _add(details, "MACD bullish crossover", 1)
             elif macd_hist < 0 and prev_hist >= 0:
                 _add(details, "MACD bearish crossover", -1)
+    if macd_val is not None:
+        if macd_val > 0:
+            _add(details, "MACD positive (bullish momentum)", 1)
+        else:
+            _add(details, "MACD negative (bearish momentum)", -1)
 
     # ------------------------------------------------------------------
     # Candlestick pattern
@@ -150,7 +191,6 @@ def generate_signal(df: pd.DataFrame) -> dict:
         elif structure == "DOWNTREND":
             _add(details, "BOS (downtrend continuation)", -1)
     if choch:
-        # CHOCH signals a possible reversal
         if structure == "UPTREND":
             _add(details, "CHOCH (potential reversal down)", -1)
         elif structure == "DOWNTREND":
@@ -184,9 +224,22 @@ def generate_signal(df: pd.DataFrame) -> dict:
     stoch_k = _get(last, "stoch_k")
     if stoch_k is not None:
         if stoch_k < 20:
-            _add(details, "Stochastic oversold", 1)
+            _add(details, "Stochastic oversold (<20)", 1)
         elif stoch_k > 80:
-            _add(details, "Stochastic overbought", -1)
+            _add(details, "Stochastic overbought (>80)", -1)
+
+    # ------------------------------------------------------------------
+    # Ichimoku Cloud position
+    # ------------------------------------------------------------------
+    span_a = _get(last, "ichimoku_span_a")
+    span_b = _get(last, "ichimoku_span_b")
+    if span_a is not None and span_b is not None and close is not None:
+        cloud_top = max(span_a, span_b)
+        cloud_bottom = min(span_a, span_b)
+        if close > cloud_top:
+            _add(details, "Price above Ichimoku cloud (bullish)", 2)
+        elif close < cloud_bottom:
+            _add(details, "Price below Ichimoku cloud (bearish)", -2)
 
     # ------------------------------------------------------------------
     # Aggregate score
@@ -200,16 +253,26 @@ def generate_signal(df: pd.DataFrame) -> dict:
     else:
         signal = "NO TRADE"
 
-    # Confidence: scale score to 0-100 using the max possible score (~18)
-    max_possible = 18
+    # Signal strength tier
+    if signal == "LONG":
+        signal_strength = "STRONG LONG" if score >= 10 else "LONG"
+    elif signal == "SHORT":
+        signal_strength = "STRONG SHORT" if score <= -10 else "SHORT"
+    else:
+        signal_strength = "NO TRADE"
+
+    # Confidence: scale score to 0-100 (max possible ~26 with all indicators)
+    max_possible = 26
     confidence = min(100, int(abs(score) / max_possible * 100))
 
     logger.info(
-        "Signal: %s | Score: %d | Confidence: %d%%", signal, score, confidence
+        "Signal: %s (%s) | Score: %d | Confidence: %d%%",
+        signal, signal_strength, score, confidence,
     )
 
     return {
         "signal": signal,
+        "signal_strength": signal_strength,
         "score": score,
         "confidence": confidence,
         "details": details,

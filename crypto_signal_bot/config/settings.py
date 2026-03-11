@@ -23,7 +23,7 @@ TIMEFRAMES: list[str] = os.getenv(
 # Full catalogue of supported pairs (used by the interactive Web UI)
 # ---------------------------------------------------------------------------
 ALL_PAIRS: list[str] = [
-    # Layer-1 / large caps
+    # ── Layer-1 / Large-cap ──────────────────────────────────────────────────
     "BTC/USDT",
     "ETH/USDT",
     "BNB/USDT",
@@ -34,32 +34,96 @@ ALL_PAIRS: list[str] = [
     "DOT/USDT",
     "MATIC/USDT",
     "LINK/USDT",
-    # Mid caps / DeFi
-    "DOGE/USDT",
-    "LTC/USDT",
-    "BCH/USDT",
-    "UNI/USDT",
-    "ATOM/USDT",
-    "FTM/USDT",
-    "NEAR/USDT",
-    "APT/USDT",
-    "ARB/USDT",
-    "OP/USDT",
-    # Meme coins
-    "SHIB/USDT",
-    "PEPE/USDT",
-    "FLOKI/USDT",
-    # Other popular futures
     "TRX/USDT",
     "TON/USDT",
+    "LTC/USDT",
+    "BCH/USDT",
+    "ETC/USDT",
+    "XLM/USDT",
+    "XMR/USDT",
+    "ALGO/USDT",
+    "VET/USDT",
+    "HBAR/USDT",
+    "FIL/USDT",
+    "ICP/USDT",
+    "EGLD/USDT",
+    "CRO/USDT",
+    "STX/USDT",
+    "NEO/USDT",
+    "IOTA/USDT",
+    "WAVES/USDT",
+    "DASH/USDT",
+    "ZEC/USDT",
+    "QTUM/USDT",
+    "ONE/USDT",
+    # ── DeFi ────────────────────────────────────────────────────────────────
+    "DOGE/USDT",
+    "UNI/USDT",
+    "ATOM/USDT",
+    "NEAR/USDT",
+    "AAVE/USDT",
+    "MKR/USDT",
+    "COMP/USDT",
+    "SNX/USDT",
+    "CRV/USDT",
+    "BAL/USDT",
+    "1INCH/USDT",
+    "SUSHI/USDT",
+    "YFI/USDT",
+    "DYDX/USDT",
+    "GMX/USDT",
+    "LDO/USDT",
+    "RPL/USDT",
+    "CAKE/USDT",
+    "PENDLE/USDT",
+    # ── Layer-2 / Scaling ────────────────────────────────────────────────────
+    "ARB/USDT",
+    "OP/USDT",
+    "APT/USDT",
     "SUI/USDT",
     "SEI/USDT",
     "INJ/USDT",
+    "IMX/USDT",
+    "ZK/USDT",
+    "STRK/USDT",
+    "MANTA/USDT",
+    # ── Meme coins ───────────────────────────────────────────────────────────
+    "SHIB/USDT",
+    "PEPE/USDT",
+    "FLOKI/USDT",
+    "WIF/USDT",
+    "BONK/USDT",
+    "BOME/USDT",
+    "MEW/USDT",
+    "ORDI/USDT",
+    # ── AI / Data ────────────────────────────────────────────────────────────
+    "FET/USDT",
+    "AGIX/USDT",
+    "TAO/USDT",
+    "OCEAN/USDT",
+    "GRT/USDT",
+    "ARKM/USDT",
+    "RNDR/USDT",
+    # ── Gaming / Metaverse ───────────────────────────────────────────────────
+    "AXS/USDT",
+    "SAND/USDT",
+    "MANA/USDT",
+    "GALA/USDT",
+    "ENJ/USDT",
+    "GMT/USDT",
+    # ── Infrastructure / Oracles ─────────────────────────────────────────────
+    "BAND/USDT",
+    "API3/USDT",
+    "TRB/USDT",
+    "UMA/USDT",
+    # ── New & trending futures ───────────────────────────────────────────────
+    "FTM/USDT",
     "TIA/USDT",
     "WLD/USDT",
     "JUP/USDT",
-    "WIF/USDT",
-    "BONK/USDT",
+    "JTO/USDT",
+    "W/USDT",
+    "PYTH/USDT",
 ]
 
 # ---------------------------------------------------------------------------
@@ -89,8 +153,8 @@ CANDLE_LIMIT: int = int(os.getenv("CANDLE_LIMIT", "200"))
 # ---------------------------------------------------------------------------
 # Signal engine thresholds
 # ---------------------------------------------------------------------------
-LONG_THRESHOLD: int = int(os.getenv("LONG_THRESHOLD", "6"))
-SHORT_THRESHOLD: int = int(os.getenv("SHORT_THRESHOLD", "-6"))
+LONG_THRESHOLD: int = int(os.getenv("LONG_THRESHOLD", "5"))
+SHORT_THRESHOLD: int = int(os.getenv("SHORT_THRESHOLD", "-5"))
 
 # ---------------------------------------------------------------------------
 # Risk management
