@@ -345,6 +345,13 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
     .rr-annotation { opacity: 0.6; }
     .no-signal-note { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
     .flex-row-gap { display: flex; align-items: center; gap: 0.4rem; }
+    .gold-tag {
+      font-size: 0.6rem; font-weight: 700;
+      padding: 0.1rem 0.4rem; border-radius: 4px;
+      background: rgba(210,153,34,0.15);
+      color: #d29922;
+      vertical-align: middle;
+    }
     .setup-price {
       font-weight: 700; font-size: 0.9rem;
       display: flex; align-items: baseline; gap: 0.3rem;
@@ -808,10 +815,16 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
     // ── Stats grid ─────────────────────────────────────────────────────────
     const trendCls = `trend-${(s.trend || 'RANGE').replace(/\s/g, '_')}`;
     const volLabel = s.vol_spike ? '🔥 Spike' : (s.vol_trend || 'flat');
+    const adxLabel = s.adx_trend || '—';
+    const adxVal   = s.adx && s.adx !== 'N/A' ? `${s.adx} (${adxLabel})` : '—';
+    const divLabel = { bullish: '📈 Bullish', bearish: '📉 Bearish', none: 'None' }[s.rsi_divergence] || 'None';
+    const divCls   = s.rsi_divergence === 'bullish' ? 'color-LONG' : s.rsi_divergence === 'bearish' ? 'color-SHORT' : '';
     const stats = `
       <div class="stats">
         <div class="stat"><div class="stat-label">RSI</div><div class="stat-value">${s.rsi || '—'}</div></div>
         <div class="stat"><div class="stat-label">Trend</div><div class="stat-value ${trendCls}">${s.trend || '—'}</div></div>
+        <div class="stat"><div class="stat-label">ADX</div><div class="stat-value">${adxVal}</div></div>
+        <div class="stat"><div class="stat-label">RSI Divergence</div><div class="stat-value ${divCls}">${divLabel}</div></div>
         <div class="stat"><div class="stat-label">Pattern</div><div class="stat-value">${s.pattern || 'None'}</div></div>
         <div class="stat"><div class="stat-label">Volume</div><div class="stat-value">${volLabel}</div></div>
         <div class="stat"><div class="stat-label">BOS</div><div class="stat-value">${s.bos ? '✅ Yes' : 'No'}</div></div>
@@ -827,6 +840,16 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
         ${sup.length ? `<div class="sr-group"><div class="sr-title">Support</div>${sup.map(r => `<div class="sr-val sup">${fmtP(r)}</div>`).join('')}</div>` : ''}
       </div>` : '';
 
+    // ── Fibonacci nearest levels ────────────────────────────────────────────
+    const fn  = s.fib_nearest || {};
+    const sfib = fn.support_fib;
+    const rfib = fn.resistance_fib;
+    const fibRow = (sfib || rfib) ? `
+      <div class="sr-row">
+        ${rfib ? `<div class="sr-group"><div class="sr-title">Fib Resistance (${rfib.level})</div><div class="sr-val res">${fmtP(rfib.price)}</div></div>` : ''}
+        ${sfib ? `<div class="sr-group"><div class="sr-title">Fib Support (${sfib.level})</div><div class="sr-val sup">${fmtP(sfib.price)}</div></div>` : ''}
+      </div>` : '';
+
     // ── Score breakdown ─────────────────────────────────────────────────────
     const details   = s.signal_details || {};
     const scoreItems = Object.entries(details).map(([k, v]) => {
@@ -839,10 +862,13 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
         <div class="score-items">${scoreItems}</div>
       </div>` : '';
 
+    const isGoldPair = ['XAU','PAXG','XAUT'].some(g => s.pair.startsWith(g));
+    const goldBadge = isGoldPair ? ' <span class="gold-tag">🥇 Gold</span>' : '';
+
     return `
     <div class="card" data-signal="${signal}">
       <div class="card-header">
-        <span class="pair-name">${s.pair}</span>
+        <span class="pair-name">${s.pair}${goldBadge}</span>
         <span class="timeframe-badge">${s.timeframe}</span>
       </div>
       ${banner}
@@ -858,6 +884,7 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
         </div>
       </div>
       ${srRow}
+      ${fibRow}
       ${scoreRow}
     </div>`;
   }

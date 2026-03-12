@@ -23,6 +23,10 @@ TIMEFRAMES: list[str] = os.getenv(
 # Full catalogue of supported pairs (used by the interactive Web UI)
 # ---------------------------------------------------------------------------
 ALL_PAIRS: list[str] = [
+    # ── Gold / Precious Metals (tokenised) ───────────────────────────────────
+    "PAXG/USDT",   # PAX Gold – most liquid on-chain gold token
+    "XAUT/USDT",   # Tether Gold
+    "XAU/USDT",    # CryptoCompare gold spot (commodity feed)
     # ── Layer-1 / Large-cap ──────────────────────────────────────────────────
     "BTC/USDT",
     "ETH/USDT",
@@ -56,6 +60,12 @@ ALL_PAIRS: list[str] = [
     "ZEC/USDT",
     "QTUM/USDT",
     "ONE/USDT",
+    "KAVA/USDT",
+    "ROSE/USDT",
+    "CHZ/USDT",
+    "ZIL/USDT",
+    "THETA/USDT",
+    "KSM/USDT",
     # ── DeFi ────────────────────────────────────────────────────────────────
     "DOGE/USDT",
     "UNI/USDT",
@@ -76,6 +86,9 @@ ALL_PAIRS: list[str] = [
     "RPL/USDT",
     "CAKE/USDT",
     "PENDLE/USDT",
+    "EIGEN/USDT",
+    "ENA/USDT",
+    "ETHFI/USDT",
     # ── Layer-2 / Scaling ────────────────────────────────────────────────────
     "ARB/USDT",
     "OP/USDT",
@@ -87,6 +100,10 @@ ALL_PAIRS: list[str] = [
     "ZK/USDT",
     "STRK/USDT",
     "MANTA/USDT",
+    "BLAST/USDT",
+    "ALT/USDT",
+    "METIS/USDT",
+    "ZETA/USDT",
     # ── Meme coins ───────────────────────────────────────────────────────────
     "SHIB/USDT",
     "PEPE/USDT",
@@ -96,6 +113,8 @@ ALL_PAIRS: list[str] = [
     "BOME/USDT",
     "MEW/USDT",
     "ORDI/USDT",
+    "SATS/USDT",
+    "NEIRO/USDT",
     # ── AI / Data ────────────────────────────────────────────────────────────
     "FET/USDT",
     "AGIX/USDT",
@@ -104,6 +123,9 @@ ALL_PAIRS: list[str] = [
     "GRT/USDT",
     "ARKM/USDT",
     "RNDR/USDT",
+    "WLD/USDT",
+    "AIOZ/USDT",
+    "NMR/USDT",
     # ── Gaming / Metaverse ───────────────────────────────────────────────────
     "AXS/USDT",
     "SAND/USDT",
@@ -111,19 +133,32 @@ ALL_PAIRS: list[str] = [
     "GALA/USDT",
     "ENJ/USDT",
     "GMT/USDT",
+    "BEAM/USDT",
+    "PIXEL/USDT",
+    "PORTAL/USDT",
     # ── Infrastructure / Oracles ─────────────────────────────────────────────
     "BAND/USDT",
     "API3/USDT",
     "TRB/USDT",
     "UMA/USDT",
+    "SUPER/USDT",
+    "DUSK/USDT",
+    # ── RWA / Real World Assets ──────────────────────────────────────────────
+    "ONDO/USDT",
+    "CFG/USDT",
     # ── New & trending futures ───────────────────────────────────────────────
     "FTM/USDT",
     "TIA/USDT",
-    "WLD/USDT",
     "JUP/USDT",
     "JTO/USDT",
     "W/USDT",
     "PYTH/USDT",
+    "IO/USDT",
+    "ZRO/USDT",
+    "LISTA/USDT",
+    "BB/USDT",
+    "NOT/USDT",
+    "DOGS/USDT",
 ]
 
 # ---------------------------------------------------------------------------

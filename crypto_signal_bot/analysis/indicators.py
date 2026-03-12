@@ -70,6 +70,8 @@ def compute_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df = _compute_vwap(df)
     df = _compute_ichimoku(df)
     df = _add_fibonacci(df)
+    df = _compute_adx(df)
+    df = _detect_rsi_divergence(df)
 
     return df
 
@@ -120,6 +122,14 @@ def _compute_with_pandas_ta(df: pd.DataFrame) -> pd.DataFrame:
     # ATR
     df["atr"] = ta.atr(high, low, close, length=14)
 
+    # ADX via pandas-ta (uses adx())
+    adx_df = ta.adx(high, low, close, length=14)
+    if adx_df is not None and not adx_df.empty:
+        # columns: ADX_14, DMP_14, DMN_14
+        df["adx"] = adx_df.iloc[:, 0]
+        df["adx_di_pos"] = adx_df.iloc[:, 1]
+        df["adx_di_neg"] = adx_df.iloc[:, 2]
+
     return df
 
 
@@ -169,7 +179,6 @@ def _compute_manual(df: pd.DataFrame) -> pd.DataFrame:
     df["atr"] = _atr(high, low, close, 14)
 
     return df
-
 
 def _rsi(series: pd.Series, period: int = 14) -> pd.Series:
     delta = series.diff()
@@ -262,4 +271,102 @@ def _add_fibonacci(df: pd.DataFrame) -> pd.DataFrame:
         "1.0": price_high,
     }
     df.attrs["fibonacci"] = fib_levels
+    return df
+
+
+# ---------------------------------------------------------------------------
+# ADX (Average Directional Index) – trend strength
+# ---------------------------------------------------------------------------
+
+
+def _compute_adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
+    """Compute ADX, +DI and -DI (manual implementation).
+
+    Columns added:
+        adx       – 0-100 trend strength (>25 = trending, >40 = strong trend)
+        adx_di_pos – +DI (bullish directional movement)
+        adx_di_neg – -DI (bearish directional movement)
+    """
+    if "adx" in df.columns:
+        # Already computed by pandas-ta path
+        return df
+
+    high = df["high"]
+    low = df["low"]
+    close = df["close"]
+
+    # True Range
+    prev_close = close.shift(1)
+    tr = pd.concat(
+        [high - low, (high - prev_close).abs(), (low - prev_close).abs()],
+        axis=1,
+    ).max(axis=1)
+
+    # Directional movements
+    up_move = high.diff()
+    down_move = -low.diff()
+
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+
+    plus_dm_s = pd.Series(plus_dm, index=df.index).ewm(com=period - 1, min_periods=period).mean()
+    minus_dm_s = pd.Series(minus_dm, index=df.index).ewm(com=period - 1, min_periods=period).mean()
+    atr_s = tr.ewm(com=period - 1, min_periods=period).mean()
+
+    plus_di = 100 * plus_dm_s / (atr_s + 1e-10)
+    minus_di = 100 * minus_dm_s / (atr_s + 1e-10)
+    dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di + 1e-10)
+
+    df["adx"] = dx.ewm(com=period - 1, min_periods=period).mean()
+    df["adx_di_pos"] = plus_di
+    df["adx_di_neg"] = minus_di
+    return df
+
+
+# ---------------------------------------------------------------------------
+# RSI divergence detector
+# ---------------------------------------------------------------------------
+
+
+def _detect_rsi_divergence(df: pd.DataFrame, lookback: int = 14) -> pd.DataFrame:
+    """Detect classic RSI divergence over the last *lookback* candles.
+
+    Adds column ``rsi_divergence``:
+        "bullish"  – price made a lower low but RSI did not  (reversal up)
+        "bearish"  – price made a higher high but RSI did not (reversal down)
+        "none"     – no divergence detected
+    """
+    df["rsi_divergence"] = "none"
+
+    if "rsi" not in df.columns or len(df) < lookback + 2:
+        return df
+
+    close = df["close"].to_numpy()
+    rsi = df["rsi"].to_numpy()
+    div = np.full(len(df), "none", dtype=object)
+
+    for i in range(lookback, len(df)):
+        window_close = close[i - lookback: i + 1]
+        window_rsi = rsi[i - lookback: i + 1]
+
+        if np.any(np.isnan(window_rsi)):
+            continue
+
+        prev_close = window_close[:-1]
+        prev_rsi = window_rsi[:-1]
+
+        prev_low_idx = int(np.argmin(prev_close))
+        prev_high_idx = int(np.argmax(prev_close))
+
+        cur_close = window_close[-1]
+        cur_rsi = window_rsi[-1]
+
+        # Bullish divergence: lower low in price but higher low in RSI
+        if cur_close < prev_close[prev_low_idx] and cur_rsi > prev_rsi[prev_low_idx]:
+            div[i] = "bullish"
+        # Bearish divergence: higher high in price but lower high in RSI
+        elif cur_close > prev_close[prev_high_idx] and cur_rsi < prev_rsi[prev_high_idx]:
+            div[i] = "bearish"
+
+    df["rsi_divergence"] = div
     return df

@@ -83,6 +83,11 @@ def run_analysis(pair: str, timeframe: str) -> dict:
 
     # 9. Summarise latest values for display
     last = df.iloc[-1]
+
+    # Nearest Fibonacci level to current price
+    fib = df.attrs.get("fibonacci", {})
+    fib_nearest = _nearest_fibonacci(risk.get("entry"), fib)
+
     summary = {
         "pair": pair,
         "timeframe": timeframe,
@@ -102,6 +107,9 @@ def run_analysis(pair: str, timeframe: str) -> dict:
         "take_profit": risk.get("take_profit"),
         "rr_ratio": risk.get("rr_ratio"),
         "rsi": _fmt(last.get("rsi")),
+        "adx": _fmt(last.get("adx")),
+        "adx_trend": _adx_label(last.get("adx")),
+        "rsi_divergence": last.get("rsi_divergence", "none"),
         "trend": last.get("structure", "RANGE"),
         "pattern": last.get("pattern", "None"),
         "vol_spike": bool(last.get("vol_spike", False)),
@@ -109,6 +117,8 @@ def run_analysis(pair: str, timeframe: str) -> dict:
         "bos": bool(last.get("bos", False)),
         "choch": bool(last.get("choch", False)),
         "sr_levels": sr_levels,
+        "fibonacci": fib,
+        "fib_nearest": fib_nearest,
         "signal_details": signal_result["details"],
     }
     return summary
@@ -152,6 +162,8 @@ def print_signal(result: dict) -> None:
 
     lines += [
         f"  RSI:        {result['rsi']}",
+        f"  ADX:        {result.get('adx', 'N/A')} ({result.get('adx_trend', 'N/A')})",
+        f"  DIVERGENCE: {result.get('rsi_divergence', 'none')}",
         f"  TREND:      {result['trend']}",
         f"  PATTERN:    {result['pattern']}",
         f"  VOLUME:     {'Spike 🔥' if result['vol_spike'] else result['vol_trend']}",
@@ -171,6 +183,14 @@ def print_signal(result: dict) -> None:
         lines.append(
             f"  SUPPORT:    {', '.join(str(s) for s in sr['support'][:3])}"
         )
+
+    fn = result.get("fib_nearest", {})
+    if fn.get("support_fib"):
+        sf = fn["support_fib"]
+        lines.append(f"  FIB SUPP:   {sf['price']} (Fib {sf['level']})")
+    if fn.get("resistance_fib"):
+        rf = fn["resistance_fib"]
+        lines.append(f"  FIB RES:    {rf['price']} (Fib {rf['level']})")
 
     lines.append(_SEPARATOR)
     print("\n".join(lines))
@@ -212,6 +232,55 @@ def _fmt(value) -> str:
         return f"{float(value):.2f}"
     except (TypeError, ValueError):
         return "N/A"
+
+
+def _adx_label(adx_value) -> str:
+    """Return a human-readable label for the ADX reading."""
+    try:
+        v = float(adx_value)
+    except (TypeError, ValueError):
+        return "N/A"
+    if v >= 40:
+        return "Very Strong"
+    if v >= 25:
+        return "Strong"
+    if v >= 20:
+        return "Moderate"
+    return "Weak / Ranging"
+
+
+def _nearest_fibonacci(price, fib: dict) -> dict:
+    """Return the two Fibonacci levels immediately below and above *price*."""
+    if not fib or price is None:
+        return {}
+    try:
+        price = float(price)
+    except (TypeError, ValueError):
+        return {}
+
+    sorted_levels = []
+    for label, level in fib.items():
+        try:
+            sorted_levels.append((label, float(level)))
+        except (TypeError, ValueError):
+            continue
+    sorted_levels.sort(key=lambda x: x[1])
+
+    below = None
+    above = None
+    for label, lv in sorted_levels:
+        if lv <= price:
+            below = (label, round(lv, 6))
+        else:
+            above = (label, round(lv, 6))
+            break  # first level above is enough
+
+    result = {}
+    if below:
+        result["support_fib"] = {"level": below[0], "price": below[1]}
+    if above:
+        result["resistance_fib"] = {"level": above[0], "price": above[1]}
+    return result
 
 
 # ---------------------------------------------------------------------------

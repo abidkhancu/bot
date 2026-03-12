@@ -16,6 +16,8 @@ EMA crossover (9 > 21)            | +2      | –
 EMA crossover (9 < 21)            | –       | -2
 Golden cross (EMA50 > SMA200)     | +2      | –
 Death cross  (EMA50 < SMA200)     | –       | -2
+EMA stack alignment (9>21>50)     | +2      | –
+EMA stack bearish  (9<21<50)      | –       | -2
 MACD crossover (bullish)          | +1      | –
 MACD crossover (bearish)          | –       | -1
 MACD position positive            | +1      | –
@@ -33,6 +35,10 @@ BB position (outside band)        | +/-1    | +/-1
 Stochastic oversold/overbought    | +1      | -1
 Ichimoku: price above cloud       | +2      | –
 Ichimoku: price below cloud       | –       | -2
+ADX > 25 (strong directional)     | +1      | -1
+ADX < 20 (ranging, any direction) | –       | -1
+RSI bullish divergence            | +2      | –
+RSI bearish divergence            | –       | -2
 
 Decision thresholds (configurable via settings):
     score >=  LONG_THRESHOLD  → LONG   (default: 5)
@@ -242,6 +248,42 @@ def generate_signal(df: pd.DataFrame) -> dict:
             _add(details, "Price below Ichimoku cloud (bearish)", -2)
 
     # ------------------------------------------------------------------
+    # EMA stack alignment (EMA9 > EMA21 > EMA50 = fully bullish)
+    # ------------------------------------------------------------------
+    if ema9 is not None and ema21 is not None and ema50 is not None:
+        if ema9 > ema21 > ema50:
+            _add(details, "EMA stack bullish (9>21>50)", 2)
+        elif ema9 < ema21 < ema50:
+            _add(details, "EMA stack bearish (9<21<50)", -2)
+
+    # ------------------------------------------------------------------
+    # ADX – confirm trend strength (filter out ranging markets)
+    # ------------------------------------------------------------------
+    adx = _get(last, "adx")
+    adx_di_pos = _get(last, "adx_di_pos")
+    adx_di_neg = _get(last, "adx_di_neg")
+    if adx is not None and adx_di_pos is not None and adx_di_neg is not None:
+        if adx > 25:
+            # Strong trend – add directional bias
+            if adx_di_pos > adx_di_neg:
+                _add(details, f"ADX strong uptrend ({adx:.0f})", 1)
+            else:
+                _add(details, f"ADX strong downtrend ({adx:.0f})", -1)
+        elif adx < 20:
+            # Weak / ranging market – penalise directional bias regardless of
+            # other indicators (a ranging market reduces trade quality for all)
+            _add(details, "ADX weak trend (<20) – ranging market", -1)
+
+    # ------------------------------------------------------------------
+    # RSI divergence
+    # ------------------------------------------------------------------
+    rsi_div = last.get("rsi_divergence", "none")
+    if rsi_div == "bullish":
+        _add(details, "RSI bullish divergence (reversal up)", 2)
+    elif rsi_div == "bearish":
+        _add(details, "RSI bearish divergence (reversal down)", -2)
+
+    # ------------------------------------------------------------------
     # Aggregate score
     # ------------------------------------------------------------------
     score = sum(details.values())
@@ -261,8 +303,8 @@ def generate_signal(df: pd.DataFrame) -> dict:
     else:
         signal_strength = "NO TRADE"
 
-    # Confidence: scale score to 0-100 (max possible ~26 with all indicators)
-    max_possible = 26
+    # Confidence: scale score to 0-100 (max possible ~34 with all indicators)
+    max_possible = 34
     confidence = min(100, int(abs(score) / max_possible * 100))
 
     logger.info(

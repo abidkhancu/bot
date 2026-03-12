@@ -12,16 +12,18 @@ A modular Python project that analyses cryptocurrency markets and outputs tradin
 ## Features
 
 - Fetches OHLCV data from public APIs (CryptoCompare, CoinGecko)
-- Technical indicators: RSI, SMA, EMA, MACD, Bollinger Bands, Stochastic, ATR, VWAP, Ichimoku, Fibonacci
+- Technical indicators: RSI, SMA, EMA, MACD, Bollinger Bands, Stochastic, ATR, VWAP, Ichimoku, Fibonacci, **ADX**
+- **RSI divergence detection**: bullish (price lower low / RSI higher low) and bearish (price higher high / RSI lower high)
 - Volume analysis: spike detection, trend, divergence
 - Market structure: trend classification, Break of Structure (BOS), Change of Character (CHOCH)
 - Candlestick pattern recognition: Doji, Hammer, Shooting Star, Pin Bar, Engulfing patterns
 - Support & resistance zones from swing highs/lows
 - **Scoring-based signal engine**: LONG / SHORT / NO TRADE with strength tiers (STRONG LONG / LONG / STRONG SHORT / SHORT)
-  - Ichimoku Cloud position, Golden/Death cross, MACD position, extended RSI bands
+  - Ichimoku Cloud, Golden/Death cross, MACD, RSI bands, **EMA stack alignment**, **ADX trend strength**, **RSI divergence**
 - **Risk management**: 1.5× ATR stop loss, three take-profit levels (TP1 1:1 / TP2 1:2 / TP3 1:3), percentage distances
-- **93 supported pairs**: BTC, ETH, SOL, BNB, XRP, ADA, AVAX, DOGE, PEPE, WIF, FET, TAO, AXS, ARB, OP, LDO, GMX, PENDLE, and many more
-- **Interactive Web UI** – real-time coin selector, multi-timeframe analysis, auto-refresh
+- **126 supported pairs** including **Gold/precious-metal tokens** (PAXG/USDT, XAUT/USDT, XAU/USDT), all major crypto categories
+- **Fibonacci nearest levels** surfaced per signal card (nearest support/resistance Fibonacci to entry)
+- **Interactive Web UI** – real-time coin selector, multi-timeframe analysis, auto-refresh, gold pair 🥇 badge
 - **GitHub Pages dashboard** – live signal cards, auto-refreshes every 5 minutes
 
 ---
@@ -222,6 +224,8 @@ It auto-refreshes every 5 minutes in the browser and is redeployed by CI every 3
 | RSI > 70 (overbought)             | −2     |
 | EMA 9 crosses above EMA 21        | +2     |
 | EMA 9 crosses below EMA 21        | −2     |
+| EMA stack bullish (9>21>50)       | +2     |
+| EMA stack bearish (9<21<50)       | −2     |
 | Golden cross (EMA50 > SMA200)     | +2     |
 | Death cross  (EMA50 < SMA200)     | −2     |
 | MACD bullish crossover            | +1     |
@@ -241,8 +245,12 @@ It auto-refreshes every 5 minutes in the browser and is redeployed by CI every 3
 | Stochastic oversold/overbought    | ±1     |
 | Price above Ichimoku cloud        | +2     |
 | Price below Ichimoku cloud        | −2     |
+| ADX > 25 (strong directional)     | ±1     |
+| ADX < 20 (ranging market)         | −1     |
+| RSI bullish divergence            | +2     |
+| RSI bearish divergence            | −2     |
 
-**Decision (max possible score: ±26):**
+**Decision (max possible score: ±34):**
 - Score ≥ 5  → **LONG** (score ≥ 10 = **STRONG LONG**)
 - Score ≤ −5 → **SHORT** (score ≤ −10 = **STRONG SHORT**)
 - Otherwise  → **NO TRADE**
