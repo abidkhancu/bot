@@ -26,7 +26,6 @@ from paper_trading.config import (
     DEFAULT_LEVERAGE,
     INITIAL_BALANCE,
     PAPERINVEST_API_KEY,
-    PAPERINVEST_API_SECRET,
     PAPERINVEST_BASE_URL,
 )
 
@@ -57,33 +56,35 @@ def _sim_reset() -> None:
 # ---------------------------------------------------------------------------
 
 class PaperInvestClient:
-    """REST client for the PaperInvest paper-trading API.
+    """REST client for the PaperInvest paper-trading (simulated) API.
 
-    When no API credentials are provided the client transparently falls back
-    to a lightweight in-process simulation so that the paper trading module
-    can be exercised without an internet connection.
+    PaperInvest is a **simulated** trading platform – no real money is at risk.
+    The bot is "live" in the sense that signals actively trigger paper orders on
+    the PaperInvest platform in real-time.
+
+    Authenticates using a single API key passed as ``Authorization: Bearer <key>``.
+
+    When no API key is configured the client falls back to a lightweight
+    in-process simulation so the module can be exercised without an internet
+    connection.
 
     Args:
-        api_key:    PaperInvest API key.  Defaults to ``PAPERINVEST_API_KEY``.
-        api_secret: PaperInvest API secret.  Defaults to ``PAPERINVEST_API_SECRET``.
-        base_url:   API base URL.  Defaults to ``PAPERINVEST_BASE_URL``.
+        api_key:  PaperInvest API key.  Defaults to ``PAPERINVEST_API_KEY``.
+        base_url: API base URL.  Defaults to ``PAPERINVEST_BASE_URL``.
     """
 
     def __init__(
         self,
         api_key: str = PAPERINVEST_API_KEY,
-        api_secret: str = PAPERINVEST_API_SECRET,
         base_url: str = PAPERINVEST_BASE_URL,
     ) -> None:
         self._key = api_key
-        self._secret = api_secret
         self._base = base_url.rstrip("/")
         self._session = requests.Session()
         if self._key:
             self._session.headers.update(
                 {
-                    "X-API-Key": self._key,
-                    "X-API-Secret": self._secret,
+                    "Authorization": f"Bearer {self._key}",
                     "Content-Type": "application/json",
                     "Accept": "application/json",
                 }

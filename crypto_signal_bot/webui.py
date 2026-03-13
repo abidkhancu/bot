@@ -85,6 +85,15 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
     header h1   { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
     header .subtitle { font-size: 0.75rem; color: var(--muted); }
     header .spacer  { flex: 1; }
+    header .nav-live-trading {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: var(--long); color: #000;
+      padding: 0.45rem 1rem; border-radius: 6px;
+      font-size: 0.82rem; font-weight: 700;
+      text-decoration: none; white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    header .nav-live-trading:hover { opacity: 0.85; }
     .status-dot {
       width: 8px; height: 8px;
       border-radius: 50%;
@@ -459,10 +468,11 @@ _DASHBOARD_HTML = r"""<!DOCTYPE html>
   <span class="logo">📡</span>
   <div>
     <h1>Crypto Signal Bot</h1>
-    <div class="subtitle">Interactive real-time analysis · Futures signals · No trades executed</div>
+    <div class="subtitle">Interactive real-time analysis · Futures signals</div>
   </div>
   <div class="spacer"></div>
-  <div>
+  <a href="/paper-trading" class="nav-live-trading">📊 Live Trading</a>
+  <div style="margin-left:1rem">
     <span class="status-dot" id="status-dot"></span>
     <span id="status-text">Ready</span>
   </div>
@@ -1025,7 +1035,7 @@ _PAPER_TRADING_HTML = r"""<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Paper Trading – Crypto Signal Bot</title>
+  <title>Live Trading – Crypto Signal Bot</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -1088,7 +1098,7 @@ _PAPER_TRADING_HTML = r"""<!DOCTYPE html>
 <body>
 <header>
   <span class="logo">📊</span>
-  <h1>Paper Trading Dashboard</h1>
+  <h1>Live Trading Dashboard</h1>
   <nav>
     <a href="/">← Back to Signals</a>
   </nav>
@@ -1096,9 +1106,9 @@ _PAPER_TRADING_HTML = r"""<!DOCTYPE html>
 </header>
 
 <div class="toggle-row">
-  <span class="toggle-label">Paper Trading:</span>
+  <span class="toggle-label">Live Trading:</span>
   <button id="toggle-btn" class="toggle-btn off" onclick="togglePaperTrading()">OFF</button>
-  <span class="toggle-label" id="toggle-desc">Signals only – no orders placed</span>
+  <span class="toggle-label" id="toggle-desc">Signals only – live simulation disabled</span>
 </div>
 
 <div class="main">
@@ -1148,8 +1158,8 @@ _PAPER_TRADING_HTML = r"""<!DOCTYPE html>
       btn.textContent = paperEnabled ? 'ON' : 'OFF';
       btn.className = 'toggle-btn ' + (paperEnabled ? 'on' : 'off');
       desc.textContent = paperEnabled
-        ? 'Paper trading active – signals trigger simulated orders'
-        : 'Signals only – no orders placed';
+        ? 'Live simulation active – signals trigger paper orders on PaperInvest (no real money)'
+        : 'Signals only – live simulation disabled';
 
       renderMetrics(portfolio, analytics);
       renderPositions(positions.positions || []);

@@ -24,8 +24,8 @@ PAPER_TRADING_ENABLED: bool = os.getenv("PAPER_TRADING_ENABLED", "false").lower(
 PAPERINVEST_BASE_URL: str = os.getenv(
     "PAPERINVEST_BASE_URL", "https://app.paperinvest.io/api/v1"
 )
+# Single API key provided by PaperInvest (no secret required)
 PAPERINVEST_API_KEY: str = os.getenv("PAPERINVEST_API_KEY", "")
-PAPERINVEST_API_SECRET: str = os.getenv("PAPERINVEST_API_SECRET", "")
 
 # Seconds to wait before retrying a failed API call
 API_RETRY_DELAY: float = float(os.getenv("PAPERINVEST_RETRY_DELAY", "2.0"))
