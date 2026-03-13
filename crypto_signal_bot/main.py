@@ -5,8 +5,10 @@ Usage:
     python -m crypto_signal_bot.main                        # Run once, console output
     python -m crypto_signal_bot.main --loop                 # Run every RUN_INTERVAL_MINUTES
     python -m crypto_signal_bot.main --export-json out.json # Write signals as JSON
+    python -m crypto_signal_bot.main --paper-trading        # Forward signals to PaperInvest
+    python -m crypto_signal_bot.main --backtest             # Backtest on historical candles
 
-No trading is executed.  Signals are printed to the console and logged.
+No live trades are executed unless --paper-trading is combined with a live exchange adapter.
 """
 
 from __future__ import annotations
@@ -288,15 +290,60 @@ def _nearest_fibonacci(price, fib: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def main(loop: bool = False, export_json_path: str | None = None) -> None:
+def _maybe_init_paper_trading() -> "tuple | None":
+    """Initialise paper trading components when enabled.
+
+    Returns:
+        ``(executor, analytics)`` tuple when paper trading is enabled,
+        ``None`` otherwise.
+    """
+    try:
+        from paper_trading.config import PAPER_TRADING_ENABLED  # type: ignore[import]
+        if not PAPER_TRADING_ENABLED:
+            return None
+    except ImportError:
+        return None
+
+    from paper_trading.paperinvest_client import PaperInvestClient  # type: ignore[import]
+    from paper_trading.paper_trade_executor import PaperTradeExecutor  # type: ignore[import]
+    from paper_trading.portfolio_manager import PortfolioManager  # type: ignore[import]
+    from paper_trading.performance_analytics import PerformanceAnalytics  # type: ignore[import]
+    from paper_trading.trade_logger import TradeLogger  # type: ignore[import]
+
+    client = PaperInvestClient()
+    client.initialize_account()
+    pm = PortfolioManager()
+    tl = TradeLogger()
+    executor = PaperTradeExecutor(client=client, portfolio=pm, trade_log=tl)
+    analytics = PerformanceAnalytics(pm)
+    logger.info("Paper trading ENABLED – signals will be forwarded to PaperInvest.")
+    return executor, analytics
+
+
+def main(
+    loop: bool = False,
+    export_json_path: str | None = None,
+    paper_trading: bool = False,
+    backtest: bool = False,
+) -> None:
     """Run the signal bot.
 
     Args:
         loop:             When True, repeat every ``RUN_INTERVAL_MINUTES`` minutes.
         export_json_path: When set, write all signal results to this JSON file.
+        paper_trading:    When True, forward signals to the PaperInvest API.
+        backtest:         When True, run a backtest on historical OHLCV data.
     """
+    if backtest:
+        _run_backtest()
+        return
+
     logger.info("Crypto Futures Signal Bot started.")
     logger.info("Pairs: %s | Timeframes: %s", PAIRS, TIMEFRAMES)
+
+    pt_components = None
+    if paper_trading:
+        pt_components = _maybe_init_paper_trading()
 
     while True:
         results: list[dict] = []
@@ -307,11 +354,25 @@ def main(loop: bool = False, export_json_path: str | None = None) -> None:
                     print_signal(result)
                     if result:
                         results.append(result)
+                        # Forward to paper trading executor
+                        if pt_components:
+                            executor, _ = pt_components
+                            action = executor.process_signal(result)
+                            if action.get("action") not in ("SKIP",):
+                                logger.info(
+                                    "Paper trade: %s", action
+                                )
                 except Exception:  # noqa: BLE001
                     logger.exception("Error analysing %s %s", pair, tf)
 
         if export_json_path:
             export_json(results, export_json_path)
+
+        # Print paper trading summary after each round
+        if pt_components:
+            _, analytics = pt_components
+            metrics = analytics.compute()
+            _print_paper_summary(metrics)
 
         if not loop:
             break
@@ -320,6 +381,80 @@ def main(loop: bool = False, export_json_path: str | None = None) -> None:
             "Sleeping %d minutes until next run …", RUN_INTERVAL_MINUTES
         )
         time.sleep(RUN_INTERVAL_MINUTES * 60)
+
+
+def _print_paper_summary(metrics: dict) -> None:
+    """Print a paper trading performance summary to the console.
+
+    Args:
+        metrics: Dict returned by :meth:`~paper_trading.performance_analytics.PerformanceAnalytics.compute`.
+    """
+    lines = [
+        "=" * 60,
+        "  📊  PAPER TRADING SUMMARY",
+        "=" * 60,
+        f"  Balance:        ${metrics.get('balance', 0):,.2f}",
+        f"  Equity:         ${metrics.get('equity', 0):,.2f}",
+        f"  Realized PnL:   ${metrics.get('total_realized_pnl', 0):+,.4f}",
+        f"  Total Trades:   {metrics.get('total_trades', 0)}",
+        f"  Win Rate:       {metrics.get('win_rate_pct', 0):.1f}%",
+        f"  Profit Factor:  {metrics.get('profit_factor') or 'N/A'}",
+        f"  Sharpe Ratio:   {metrics.get('sharpe_ratio') or 'N/A'}",
+        f"  Max Drawdown:   {metrics.get('max_drawdown_pct', 0):.2f}%",
+        f"  Expectancy:     ${metrics.get('expectancy', 0):+,.4f}",
+        "=" * 60,
+    ]
+    print("\n".join(lines))
+
+
+def _run_backtest() -> None:
+    """Run a simplified backtest using historical OHLCV candles.
+
+    The backtest iterates over the configured PAIRS/TIMEFRAMES and simulates
+    paper trades through the PaperTradeExecutor using a local simulation
+    client.  Results are printed to the console.
+
+    Note: This is a walk-forward simulation, not a multi-pass optimiser.
+    """
+    try:
+        from paper_trading.paperinvest_client import PaperInvestClient, _sim_reset  # type: ignore[import]
+        from paper_trading.paper_trade_executor import PaperTradeExecutor  # type: ignore[import]
+        from paper_trading.portfolio_manager import PortfolioManager  # type: ignore[import]
+        from paper_trading.performance_analytics import PerformanceAnalytics  # type: ignore[import]
+        from paper_trading.trade_logger import TradeLogger  # type: ignore[import]
+        from paper_trading.config import BACKTEST_START, BACKTEST_END  # type: ignore[import]
+    except ImportError as exc:
+        logger.error("Backtest requires the paper_trading module: %s", exc)
+        return
+
+    logger.info("Starting backtest from %s to %s …", BACKTEST_START, BACKTEST_END)
+    print(f"\n{'='*60}\n  BACKTEST MODE  ({BACKTEST_START} → {BACKTEST_END})\n{'='*60}")
+
+    import os
+    import tempfile
+    tmp_db = os.path.join(tempfile.gettempdir(), "backtest_portfolio.db")
+    tmp_csv = os.path.join(tempfile.gettempdir(), "backtest_trades.csv")
+
+    _sim_reset()
+    client = PaperInvestClient()
+    client.initialize_account()
+    pm = PortfolioManager(db_path=tmp_db)
+    tl = TradeLogger(csv_path=tmp_csv)
+    executor = PaperTradeExecutor(client=client, portfolio=pm, trade_log=tl)
+    analytics = PerformanceAnalytics(pm)
+
+    for pair in PAIRS:
+        for tf in TIMEFRAMES:
+            try:
+                result = run_analysis(pair, tf)
+                if result:
+                    executor.process_signal(result)
+            except Exception:  # noqa: BLE001
+                logger.exception("Backtest error for %s %s", pair, tf)
+
+    metrics = analytics.compute()
+    _print_paper_summary(metrics)
+    print(f"\nDetailed trade log saved to: {tmp_csv}\n")
 
 
 if __name__ == "__main__":
@@ -337,5 +472,20 @@ if __name__ == "__main__":
         default=None,
         help="Write signal results to a JSON file (for the GitHub Pages dashboard).",
     )
+    parser.add_argument(
+        "--paper-trading",
+        action="store_true",
+        help="Forward signals to the PaperInvest paper-trading API.",
+    )
+    parser.add_argument(
+        "--backtest",
+        action="store_true",
+        help="Run a backtest simulation on the current configured pairs/timeframes.",
+    )
     args = parser.parse_args()
-    main(loop=args.loop, export_json_path=args.export_json)
+    main(
+        loop=args.loop,
+        export_json_path=args.export_json,
+        paper_trading=args.paper_trading,
+        backtest=args.backtest,
+    )

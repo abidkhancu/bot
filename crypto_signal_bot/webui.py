@@ -8,6 +8,7 @@ allowing users to:
   - Choose one or more timeframes (1m, 5m, 15m, 30m, 1h, 4h, 1d)
   - Trigger on-demand live analysis with a single click
   - Enable auto-refresh for continuous real-time monitoring
+  - View the Paper Trading dashboard at /paper-trading
 
 Usage
 -----
@@ -1016,8 +1017,403 @@ def api_analyze():
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Paper Trading dashboard and API routes
 # ---------------------------------------------------------------------------
+
+_PAPER_TRADING_HTML = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paper Trading – Crypto Signal Bot</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
+      --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+      --green: #3fb950; --red: #f85149; --accent: #58a6ff;
+      --warn: #d29922; --radius: 10px;
+    }
+    body { background:var(--bg); color:var(--text);
+           font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; }
+    header { background:var(--surface); border-bottom:1px solid var(--border);
+             padding:1rem 2rem; display:flex; align-items:center; gap:1rem; }
+    header h1 { font-size:1.1rem; font-weight:700; }
+    header .logo { font-size:1.5rem; }
+    header nav a { color:var(--accent); text-decoration:none; font-size:.85rem;
+                   margin-left:1.5rem; }
+    header nav a:hover { text-decoration:underline; }
+    .toggle-row { display:flex; align-items:center; gap:1rem; padding:1rem 2rem;
+                  background:var(--surface2); border-bottom:1px solid var(--border); }
+    .toggle-label { font-size:.85rem; color:var(--muted); }
+    .toggle-btn { padding:.4rem 1rem; border-radius:6px; border:none; cursor:pointer;
+                  font-weight:600; font-size:.85rem; }
+    .toggle-btn.on  { background:var(--green); color:#000; }
+    .toggle-btn.off { background:var(--red);   color:#fff; }
+    .main { max-width:1100px; margin:2rem auto; padding:0 1rem; }
+    .section-title { font-size:1rem; font-weight:700; margin-bottom:1rem;
+                     color:var(--accent); }
+    .metrics-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr));
+                    gap:1rem; margin-bottom:2rem; }
+    .metric-card { background:var(--surface); border:1px solid var(--border);
+                   border-radius:var(--radius); padding:1rem; }
+    .metric-label { font-size:.7rem; color:var(--muted); text-transform:uppercase;
+                    letter-spacing:.05em; margin-bottom:.4rem; }
+    .metric-value { font-size:1.3rem; font-weight:700; }
+    .metric-value.pos { color:var(--green); }
+    .metric-value.neg { color:var(--red); }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; margin-bottom:2rem; }
+    th { text-align:left; padding:.5rem .75rem; background:var(--surface);
+         border-bottom:1px solid var(--border); color:var(--muted);
+         text-transform:uppercase; letter-spacing:.05em; font-size:.7rem; }
+    td { padding:.5rem .75rem; border-bottom:1px solid var(--border); }
+    tr:hover td { background:var(--surface2); }
+    .pos { color:var(--green); }
+    .neg { color:var(--red); }
+    .badge { display:inline-block; padding:.2rem .5rem; border-radius:4px;
+             font-size:.7rem; font-weight:700; }
+    .badge.buy  { background:rgba(63,185,80,.2); color:var(--green); }
+    .badge.sell { background:rgba(248,81,73,.2); color:var(--red); }
+    .badge.open { background:rgba(88,166,255,.2); color:var(--accent); }
+    .badge.closed { background:rgba(139,148,158,.2); color:var(--muted); }
+    .btn { padding:.5rem 1.2rem; border:none; border-radius:6px; cursor:pointer;
+           font-weight:600; font-size:.85rem; }
+    .btn-primary { background:var(--accent); color:#000; }
+    .btn-danger  { background:var(--red);    color:#fff; }
+    .empty-state { text-align:center; color:var(--muted); padding:3rem;
+                   font-size:.9rem; }
+    #status-msg { font-size:.8rem; color:var(--muted); margin-left:auto; }
+  </style>
+</head>
+<body>
+<header>
+  <span class="logo">📊</span>
+  <h1>Paper Trading Dashboard</h1>
+  <nav>
+    <a href="/">← Back to Signals</a>
+  </nav>
+  <span id="status-msg">Loading…</span>
+</header>
+
+<div class="toggle-row">
+  <span class="toggle-label">Paper Trading:</span>
+  <button id="toggle-btn" class="toggle-btn off" onclick="togglePaperTrading()">OFF</button>
+  <span class="toggle-label" id="toggle-desc">Signals only – no orders placed</span>
+</div>
+
+<div class="main">
+  <!-- Metrics -->
+  <div class="section-title">Portfolio Overview</div>
+  <div class="metrics-grid" id="metrics-grid">
+    <div class="metric-card"><div class="metric-label">Balance</div><div class="metric-value" id="m-balance">–</div></div>
+    <div class="metric-card"><div class="metric-label">Equity</div><div class="metric-value" id="m-equity">–</div></div>
+    <div class="metric-card"><div class="metric-label">Realized PnL</div><div class="metric-value" id="m-pnl">–</div></div>
+    <div class="metric-card"><div class="metric-label">Win Rate</div><div class="metric-value" id="m-winrate">–</div></div>
+    <div class="metric-card"><div class="metric-label">Total Trades</div><div class="metric-value" id="m-trades">–</div></div>
+    <div class="metric-card"><div class="metric-label">Profit Factor</div><div class="metric-value" id="m-pf">–</div></div>
+    <div class="metric-card"><div class="metric-label">Sharpe Ratio</div><div class="metric-value" id="m-sharpe">–</div></div>
+    <div class="metric-card"><div class="metric-label">Max Drawdown</div><div class="metric-value" id="m-dd">–</div></div>
+    <div class="metric-card"><div class="metric-label">Expectancy</div><div class="metric-value" id="m-exp">–</div></div>
+  </div>
+
+  <!-- Open Positions -->
+  <div class="section-title">Open Positions</div>
+  <div id="positions-container">
+    <div class="empty-state">No open positions</div>
+  </div>
+
+  <!-- Trade History -->
+  <div class="section-title">Trade History</div>
+  <div id="history-container">
+    <div class="empty-state">No closed trades yet</div>
+  </div>
+</div>
+
+<script>
+  let paperEnabled = false;
+
+  async function load() {
+    try {
+      const [ptState, portfolio, positions, history, analytics] = await Promise.all([
+        fetch('/api/paper-trading/status').then(r=>r.json()),
+        fetch('/api/paper-trading/portfolio').then(r=>r.json()),
+        fetch('/api/paper-trading/positions').then(r=>r.json()),
+        fetch('/api/paper-trading/history').then(r=>r.json()),
+        fetch('/api/paper-trading/analytics').then(r=>r.json()),
+      ]);
+
+      paperEnabled = ptState.enabled;
+      const btn = document.getElementById('toggle-btn');
+      const desc = document.getElementById('toggle-desc');
+      btn.textContent = paperEnabled ? 'ON' : 'OFF';
+      btn.className = 'toggle-btn ' + (paperEnabled ? 'on' : 'off');
+      desc.textContent = paperEnabled
+        ? 'Paper trading active – signals trigger simulated orders'
+        : 'Signals only – no orders placed';
+
+      renderMetrics(portfolio, analytics);
+      renderPositions(positions.positions || []);
+      renderHistory(history.trades || []);
+      document.getElementById('status-msg').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+    } catch(e) {
+      document.getElementById('status-msg').textContent = 'Error loading data';
+    }
+  }
+
+  function renderMetrics(portfolio, analytics) {
+    const fmt = (v, prefix='$', dec=2) =>
+      v == null ? '–' : `${prefix}${Number(v).toFixed(dec)}`;
+    const pnl = analytics.total_realized_pnl || 0;
+
+    document.getElementById('m-balance').textContent = fmt(portfolio.balance);
+    document.getElementById('m-equity').textContent  = fmt(portfolio.equity);
+    const pnlEl = document.getElementById('m-pnl');
+    pnlEl.textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(4);
+    pnlEl.className = 'metric-value ' + (pnl >= 0 ? 'pos' : 'neg');
+    document.getElementById('m-winrate').textContent =
+      analytics.win_rate_pct != null ? analytics.win_rate_pct.toFixed(1) + '%' : '–';
+    document.getElementById('m-trades').textContent  = analytics.total_trades ?? '–';
+    document.getElementById('m-pf').textContent      = analytics.profit_factor ?? '–';
+    document.getElementById('m-sharpe').textContent  = analytics.sharpe_ratio ?? '–';
+    document.getElementById('m-dd').textContent      =
+      analytics.max_drawdown_pct != null ? analytics.max_drawdown_pct.toFixed(2) + '%' : '–';
+    document.getElementById('m-exp').textContent     =
+      analytics.expectancy != null ? '$' + analytics.expectancy.toFixed(4) : '–';
+  }
+
+  function renderPositions(positions) {
+    const el = document.getElementById('positions-container');
+    if (!positions.length) {
+      el.innerHTML = '<div class="empty-state">No open positions</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Symbol</th><th>Side</th><th>Entry</th><th>Qty</th>
+          <th>Leverage</th><th>Stop Loss</th><th>Take Profit</th><th>Opened</th>
+          <th>Action</th>
+        </tr></thead>
+        <tbody>
+          ${positions.map(p => `
+            <tr>
+              <td>${p.symbol}</td>
+              <td><span class="badge ${p.side==='BUY'?'buy':'sell'}">${p.side}</span></td>
+              <td>${Number(p.entry_price).toFixed(4)}</td>
+              <td>${Number(p.quantity).toFixed(6)}</td>
+              <td>x${p.leverage}</td>
+              <td>${p.stop_loss != null ? Number(p.stop_loss).toFixed(4) : '–'}</td>
+              <td>${p.take_profit != null ? Number(p.take_profit).toFixed(4) : '–'}</td>
+              <td>${p.opened_at ? p.opened_at.slice(0,19).replace('T',' ') : '–'}</td>
+              <td>
+                <button class="btn btn-danger" onclick="closePos('${p.symbol}')">Close</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function renderHistory(trades) {
+    const el = document.getElementById('history-container');
+    const closed = trades.filter(t => t.status === 'CLOSED');
+    if (!closed.length) {
+      el.innerHTML = '<div class="empty-state">No closed trades yet</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th>
+          <th>Qty</th><th>PnL</th><th>Duration</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          ${closed.map(t => {
+            const pnl = t.pnl != null ? Number(t.pnl) : null;
+            return `<tr>
+              <td>${t.symbol}</td>
+              <td><span class="badge ${t.side==='BUY'?'buy':'sell'}">${t.side}</span></td>
+              <td>${t.entry_price != null ? Number(t.entry_price).toFixed(4) : '–'}</td>
+              <td>${t.exit_price  != null ? Number(t.exit_price).toFixed(4)  : '–'}</td>
+              <td>${Number(t.quantity).toFixed(6)}</td>
+              <td class="${pnl==null?'':pnl>=0?'pos':'neg'}">
+                ${pnl==null ? '–' : (pnl>=0?'+$':'-$')+Math.abs(pnl).toFixed(4)}
+              </td>
+              <td>${t.trade_duration || '–'}</td>
+              <td><span class="badge closed">CLOSED</span></td>
+            </tr>`;}).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  async function togglePaperTrading() {
+    const newState = !paperEnabled;
+    await fetch('/api/paper-trading/toggle', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({enabled: newState})
+    });
+    await load();
+  }
+
+  async function closePos(symbol) {
+    if (!confirm(`Close position for ${symbol}?`)) return;
+    await fetch('/api/paper-trading/close', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({symbol})
+    });
+    await load();
+  }
+
+  load();
+  setInterval(load, 15000);
+</script>
+</body>
+</html>
+"""
+
+
+# Singleton paper trading components (lazily initialised)
+_pt_executor = None
+_pt_analytics = None
+_pt_enabled = False
+
+
+def _get_paper_components():
+    """Return (executor, analytics) tuple, creating them if needed."""
+    global _pt_executor, _pt_analytics  # noqa: PLW0603
+    if _pt_executor is None:
+        try:
+            from paper_trading.paperinvest_client import PaperInvestClient  # type: ignore[import]
+            from paper_trading.paper_trade_executor import PaperTradeExecutor  # type: ignore[import]
+            from paper_trading.portfolio_manager import PortfolioManager  # type: ignore[import]
+            from paper_trading.performance_analytics import PerformanceAnalytics  # type: ignore[import]
+            from paper_trading.trade_logger import TradeLogger  # type: ignore[import]
+
+            client = PaperInvestClient()
+            client.initialize_account()
+            pm = PortfolioManager()
+            tl = TradeLogger()
+            _pt_executor = PaperTradeExecutor(client=client, portfolio=pm, trade_log=tl)
+            _pt_analytics = PerformanceAnalytics(pm)
+        except ImportError as exc:
+            logger.error("paper_trading module unavailable: %s", exc)
+            return None, None
+    return _pt_executor, _pt_analytics
+
+
+@app.route("/paper-trading")
+def paper_trading_page():
+    """Serve the paper trading dashboard HTML page."""
+    return _PAPER_TRADING_HTML
+
+
+@app.route("/api/paper-trading/status")
+def api_pt_status():
+    """Return the current paper trading enabled/disabled state."""
+    return jsonify({"enabled": _pt_enabled})
+
+
+@app.route("/api/paper-trading/toggle", methods=["POST"])
+def api_pt_toggle():
+    """Toggle paper trading on or off."""
+    global _pt_enabled  # noqa: PLW0603
+    data = request.get_json(silent=True) or {}
+    _pt_enabled = bool(data.get("enabled", not _pt_enabled))
+    logger.info("Paper trading toggled: %s", "ON" if _pt_enabled else "OFF")
+    return jsonify({"enabled": _pt_enabled})
+
+
+@app.route("/api/paper-trading/portfolio")
+def api_pt_portfolio():
+    """Return the current portfolio snapshot."""
+    executor, _ = _get_paper_components()
+    if executor is None:
+        return jsonify({"error": "paper_trading module not available"}), 503
+    portfolio = executor._pm.get_portfolio()  # noqa: SLF001
+    return jsonify(portfolio)
+
+
+@app.route("/api/paper-trading/analytics")
+def api_pt_analytics():
+    """Return performance analytics metrics."""
+    _, analytics = _get_paper_components()
+    if analytics is None:
+        return jsonify({"error": "paper_trading module not available"}), 503
+    return jsonify(analytics.compute())
+
+
+@app.route("/api/paper-trading/positions")
+def api_pt_positions():
+    """Return currently open positions."""
+    executor, _ = _get_paper_components()
+    if executor is None:
+        return jsonify({"error": "paper_trading module not available"}), 503
+    positions = executor._pm.get_open_positions()  # noqa: SLF001
+    return jsonify({"positions": positions})
+
+
+@app.route("/api/paper-trading/history")
+def api_pt_history():
+    """Return closed trade history."""
+    executor, _ = _get_paper_components()
+    if executor is None:
+        return jsonify({"error": "paper_trading module not available"}), 503
+    limit = int(request.args.get("limit", 100))
+    trades = executor._pm.get_trade_history(limit=limit)  # noqa: SLF001
+    return jsonify({"trades": trades})
+
+
+@app.route("/api/paper-trading/execute", methods=["POST"])
+def api_pt_execute():
+    """Manually execute a paper trade for a given signal result.
+
+    Expects JSON body with ``pair`` and ``timeframe``.
+    """
+    data = request.get_json(silent=True) or {}
+    pair = data.get("pair", "").strip()
+    timeframe = data.get("timeframe", "15m")
+
+    if not pair:
+        return jsonify({"error": "Missing 'pair' in request body"}), 400
+
+    executor, _ = _get_paper_components()
+    if executor is None:
+        return jsonify({"error": "paper_trading module not available"}), 503
+
+    try:
+        signal_result = run_analysis(pair, timeframe)
+        if not signal_result:
+            return jsonify({"error": "No data available for this pair/timeframe"}), 404
+        action = executor.process_signal(signal_result)
+        return jsonify({"signal": _serialise(signal_result), "action": action})
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Error executing paper trade for %s %s", pair, timeframe)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/paper-trading/close", methods=["POST"])
+def api_pt_close():
+    """Close an open paper position.
+
+    Expects JSON body with ``symbol`` and optional ``exit_price``.
+    """
+    data = request.get_json(silent=True) or {}
+    symbol = data.get("symbol", "").strip()
+    exit_price = data.get("exit_price")
+
+    if not symbol:
+        return jsonify({"error": "Missing 'symbol' in request body"}), 400
+
+    executor, _ = _get_paper_components()
+    if executor is None:
+        return jsonify({"error": "paper_trading module not available"}), 503
+
+    action = executor.close_signal(symbol, exit_price)
+    return jsonify(action)
+
+
 
 
 def main() -> None:
