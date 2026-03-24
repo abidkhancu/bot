@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crypto Signal Bot – Live Dashboard</title>
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --long:      #3fb950;
+      --short:     #f85149;
+      --notrade:   #8b949e;
+      --accent:    #58a6ff;
+      --warn:      #d29922;
+      --radius:    10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header .logo { font-size: 1.5rem; }
+    header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+    header .subtitle { font-size: 0.8rem; color: var(--muted); }
+    header .spacer { flex: 1; }
+    #last-updated { font-size: 0.75rem; color: var(--muted); text-align: right; }
+    #last-updated span { display: block; font-weight: 600; color: var(--text); }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      padding: 0.75rem 2rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .filter-label { font-size: 0.8rem; color: var(--muted); margin-right: 0.25rem; }
+    .filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 0.25rem; }
+    .chip {
+      padding: 0.3rem 0.85rem;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip:hover, .chip.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.08); }
+    .chip.active { font-weight: 600; }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1rem;
+      padding: 0 2rem 2rem;
+    }
+
+    /* ── Signal card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .pair { font-size: 1rem; font-weight: 700; letter-spacing: 0.02em; }
+    .timeframe {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
+      background: rgba(88,166,255,0.12);
+      color: var(--accent);
+    }
+
+    .signal-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 1rem;
+      border-radius: 99px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin: 0.85rem 1rem 0.5rem;
+    }
+    .signal-badge.LONG    { background: rgba(63,185,80,0.15);  color: var(--long);  border: 1px solid rgba(63,185,80,0.3); }
+    .signal-badge.SHORT   { background: rgba(248,81,73,0.15);  color: var(--short); border: 1px solid rgba(248,81,73,0.3); }
+    .signal-badge.NOTRADE { background: rgba(139,148,158,0.12); color: var(--notrade); border: 1px solid rgba(139,148,158,0.25); }
+
+    /* ── Price row ── */
+    .prices {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem 0.75rem;
+    }
+    .price-block { text-align: center; }
+    .price-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .price-value { font-size: 0.9rem; font-weight: 600; margin-top: 0.15rem; }
+    .price-value.entry  { color: var(--accent); }
+    .price-value.sl     { color: var(--short); }
+    .price-value.tp     { color: var(--long); }
+
+    /* ── Stats grid ── */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border-top: 1px solid var(--border);
+    }
+    .stat {
+      padding: 0.55rem 1rem;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+    .stat:nth-child(even) { border-right: none; }
+    .stat-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-value { font-size: 0.82rem; font-weight: 600; margin-top: 0.1rem; }
+    .trend-UPTREND   { color: var(--long); }
+    .trend-DOWNTREND { color: var(--short); }
+    .trend-RANGE     { color: var(--warn); }
+
+    /* ── Confidence bar ── */
+    .confidence-row {
+      padding: 0.6rem 1rem 0.8rem;
+      border-top: 1px solid var(--border);
+    }
+    .conf-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+    .conf-label { font-size: 0.7rem; color: var(--muted); }
+    .conf-pct   { font-size: 0.82rem; font-weight: 700; }
+    .conf-bar-bg { background: var(--border); border-radius: 99px; height: 5px; }
+    .conf-bar-fill { height: 5px; border-radius: 99px; transition: width 0.6s ease; }
+
+    /* ── SR levels ── */
+    .sr-row {
+      padding: 0.5rem 1rem 0.75rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.72rem;
+      display: flex;
+      gap: 1rem;
+    }
+    .sr-group { flex: 1; }
+    .sr-title { color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem; }
+    .sr-val   { font-weight: 600; }
+    .sr-val.res { color: var(--short); }
+    .sr-val.sup { color: var(--long); }
+
+    /* ── Score breakdown ── */
+    .score-details {
+      padding: 0.5rem 1rem 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .score-title { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem; }
+    .score-items { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .score-item {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+    }
+    .score-pos { background: rgba(63,185,80,0.12); color: var(--long); }
+    .score-neg { background: rgba(248,81,73,0.12); color: var(--short); }
+
+    /* ── Empty state ── */
+    .empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+    }
+    .empty .icon { font-size: 3rem; display: block; margin-bottom: 1rem; }
+    .empty p { font-size: 0.9rem; }
+
+    /* ── Loading spinner ── */
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      gap: 1rem;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error banner ── */
+    #error-banner {
+      display: none;
+      background: rgba(248,81,73,0.1);
+      border: 1px solid rgba(248,81,73,0.35);
+      border-radius: var(--radius);
+      margin: 1rem 2rem;
+      padding: 1rem;
+      color: var(--short);
+      font-size: 0.85rem;
+    }
+
+    /* ── Summary bar ── */
+    .summary-bar {
+      display: flex;
+      gap: 1.5rem;
+      padding: 0.75rem 2rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .summary-item { font-size: 0.8rem; }
+    .summary-item .lbl { color: var(--muted); }
+    .summary-item .val { font-weight: 700; margin-left: 0.35rem; }
+    .val.long  { color: var(--long); }
+    .val.short { color: var(--short); }
+    .val.notrade { color: var(--muted); }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      header { flex-wrap: wrap; }
+      .grid  { padding: 0 1rem 1.5rem; }
+      .filter-bar, .summary-bar { padding: 0.75rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">📡</span>
+  <div>
+    <h1>Crypto Signal Bot</h1>
+    <div class="subtitle">Futures signal analysis dashboard · No trades executed</div>
+  </div>
+  <div class="spacer"></div>
+  <div id="last-updated">
+    <div class="lbl" style="font-size:0.7rem;color:var(--muted)">LAST UPDATED</div>
+    <span id="update-time">—</span>
+  </div>
+</header>
+
+<div id="error-banner"></div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <span>Loading signals…</span>
+</div>
+
+<div id="app" style="display:none">
+  <!-- summary counts -->
+  <div class="summary-bar" id="summary-bar"></div>
+
+  <!-- filter chips -->
+  <div class="filter-bar" id="filter-bar">
+    <span class="filter-label">Signal:</span>
+    <button class="chip active" data-filter-type="signal" data-filter="ALL">All</button>
+    <button class="chip" data-filter-type="signal" data-filter="LONG">🟢 Long</button>
+    <button class="chip" data-filter-type="signal" data-filter="SHORT">🔴 Short</button>
+    <button class="chip" data-filter-type="signal" data-filter="NO TRADE">⚪ No Trade</button>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Timeframe:</span>
+    <button class="chip active" data-filter-type="tf" data-filter="ALL">All</button>
+    <button class="chip" data-filter-type="tf" data-filter="1m">1m</button>
+    <button class="chip" data-filter-type="tf" data-filter="5m">5m</button>
+    <button class="chip" data-filter-type="tf" data-filter="15m">15m</button>
+    <button class="chip" data-filter-type="tf" data-filter="30m">30m</button>
+    <button class="chip" data-filter-type="tf" data-filter="1h">1h</button>
+    <button class="chip" data-filter-type="tf" data-filter="4h">4h</button>
+    <button class="chip" data-filter-type="tf" data-filter="1d">1d</button>
+  </div>
+
+  <!-- cards grid -->
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let allSignals = [];
+  let activeFilter = 'ALL';
+  let activeTfFilter = 'ALL';
+
+  // ── Fetch data ─────────────────────────────────────────────────────────────
+  async function loadSignals() {
+    try {
+      // Cache-bust so the browser always gets the freshest JSON
+      const url = 'signals.json?t=' + Date.now();
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const data = await res.json();
+
+      allSignals = data.signals || [];
+      document.getElementById('update-time').textContent =
+        data.generated_at ? formatDate(data.generated_at) : '—';
+
+      render();
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('app').style.display     = 'block';
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  function render() {
+    let signals = allSignals;
+    if (activeFilter !== 'ALL') signals = signals.filter(s => s.signal === activeFilter);
+    if (activeTfFilter !== 'ALL') signals = signals.filter(s => s.timeframe === activeTfFilter);
+
+    renderSummary();
+    renderGrid(signals);
+  }
+
+  function renderSummary() {
+    const counts = { LONG: 0, SHORT: 0, 'NO TRADE': 0 };
+    allSignals.forEach(s => { if (s.signal in counts) counts[s.signal]++; });
+    document.getElementById('summary-bar').innerHTML = `
+      <div class="summary-item"><span class="lbl">Total</span><span class="val">${allSignals.length}</span></div>
+      <div class="summary-item"><span class="lbl">Long</span><span class="val long">${counts['LONG']}</span></div>
+      <div class="summary-item"><span class="lbl">Short</span><span class="val short">${counts['SHORT']}</span></div>
+      <div class="summary-item"><span class="lbl">No Trade</span><span class="val notrade">${counts['NO TRADE']}</span></div>
+    `;
+  }
+
+  function renderGrid(signals) {
+    const grid = document.getElementById('grid');
+    if (!signals.length) {
+      grid.innerHTML = `<div class="empty"><span class="icon">🔍</span><p>No signals match the current filter.</p></div>`;
+      return;
+    }
+    grid.innerHTML = signals.map(buildCard).join('');
+  }
+
+  // ── Card builder ───────────────────────────────────────────────────────────
+  function buildCard(s) {
+    const signal    = s.signal || 'NO TRADE';
+    const badgeCls  = signal === 'NO TRADE' ? 'NOTRADE' : signal;
+    const emoji     = { LONG: '🟢', SHORT: '🔴', 'NO TRADE': '⚪' }[signal] || '';
+    const confColor = signal === 'LONG' ? '#3fb950' : signal === 'SHORT' ? '#f85149' : '#8b949e';
+
+    // Prices
+    const priceRow = (s.stop_loss != null) ? `
+      <div class="prices">
+        <div class="price-block">
+          <div class="price-label">Entry</div>
+          <div class="price-value entry">${fmt(s.entry)}</div>
+        </div>
+        <div class="price-block">
+          <div class="price-label">Stop Loss</div>
+          <div class="price-value sl">${fmt(s.stop_loss)}</div>
+        </div>
+        <div class="price-block">
+          <div class="price-label">Take Profit</div>
+          <div class="price-value tp">${fmt(s.take_profit)}</div>
+        </div>
+      </div>` : (s.entry != null ? `
+      <div class="prices">
+        <div class="price-block" style="grid-column:1/-1">
+          <div class="price-label">Current Price</div>
+          <div class="price-value entry">${fmt(s.entry)}</div>
+        </div>
+      </div>` : '');
+
+    // Stats
+    const trendCls = `trend-${(s.trend||'RANGE').replace(/\s/g,'_')}`;
+    const volLabel = s.vol_spike ? '🔥 Spike' : (s.vol_trend || 'flat');
+    const stats = `
+      <div class="stats">
+        <div class="stat"><div class="stat-label">RSI</div><div class="stat-value">${s.rsi || '—'}</div></div>
+        <div class="stat"><div class="stat-label">Trend</div><div class="stat-value ${trendCls}">${s.trend || '—'}</div></div>
+        <div class="stat"><div class="stat-label">Pattern</div><div class="stat-value">${s.pattern || 'None'}</div></div>
+        <div class="stat"><div class="stat-label">Volume</div><div class="stat-value">${volLabel}</div></div>
+        <div class="stat"><div class="stat-label">BOS</div><div class="stat-value">${s.bos ? '✅ Yes' : 'No'}</div></div>
+        <div class="stat"><div class="stat-label">CHOCH</div><div class="stat-value">${s.choch ? '⚠️ Yes' : 'No'}</div></div>
+      </div>`;
+
+    // S/R
+    const res = (s.sr_levels && s.sr_levels.resistance || []).slice(0,3);
+    const sup = (s.sr_levels && s.sr_levels.support    || []).slice(0,3);
+    const srRow = (res.length || sup.length) ? `
+      <div class="sr-row">
+        ${res.length ? `<div class="sr-group"><div class="sr-title">Resistance</div>${res.map(r=>`<div class="sr-val res">${fmt(r)}</div>`).join('')}</div>` : ''}
+        ${sup.length ? `<div class="sr-group"><div class="sr-title">Support</div>${sup.map(r=>`<div class="sr-val sup">${fmt(r)}</div>`).join('')}</div>` : ''}
+      </div>` : '';
+
+    // Score details
+    const details = s.signal_details || {};
+    const scoreItems = Object.entries(details).map(([k,v]) => {
+      const cls = v > 0 ? 'score-pos' : 'score-neg';
+      return `<span class="score-item ${cls}">${v > 0 ? '+' : ''}${v} ${k}</span>`;
+    }).join('');
+    const scoreRow = scoreItems ? `
+      <div class="score-details">
+        <div class="score-title">Score breakdown (total: ${s.score > 0 ? '+' : ''}${s.score})</div>
+        <div class="score-items">${scoreItems}</div>
+      </div>` : '';
+
+    // RR label
+    const rrLabel = s.rr_ratio != null
+      ? `<span style="font-size:0.7rem;color:var(--muted);margin-left:0.5rem">RR 1:${s.rr_ratio}</span>`
+      : '';
+
+    return `
+    <div class="card" data-signal="${signal}">
+      <div class="card-header">
+        <span class="pair">${s.pair}</span>
+        <span class="timeframe">${s.timeframe}</span>
+      </div>
+      <div style="padding:0.2rem 1rem 0">
+        <span class="signal-badge ${badgeCls}">${emoji} ${signal}</span>${rrLabel}
+      </div>
+      ${priceRow}
+      ${stats}
+      <div class="confidence-row">
+        <div class="conf-header">
+          <span class="conf-label">Confidence</span>
+          <span class="conf-pct" style="color:${confColor}">${s.confidence}%</span>
+        </div>
+        <div class="conf-bar-bg">
+          <div class="conf-bar-fill" style="width:${s.confidence}%;background:${confColor}"></div>
+        </div>
+      </div>
+      ${srRow}
+      ${scoreRow}
+    </div>`;
+  }
+
+  // ── Filters ────────────────────────────────────────────────────────────────
+  document.getElementById('filter-bar').addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    const type = chip.dataset.filterType;
+    if (type === 'signal') {
+      activeFilter = chip.dataset.filter;
+      document.querySelectorAll('[data-filter-type="signal"]').forEach(c => c.classList.remove('active'));
+    } else if (type === 'tf') {
+      activeTfFilter = chip.dataset.filter;
+      document.querySelectorAll('[data-filter-type="tf"]').forEach(c => c.classList.remove('active'));
+    }
+    chip.classList.add('active');
+    render();
+  });
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function fmt(v) {
+    if (v == null) return '—';
+    const n = parseFloat(v);
+    return isNaN(n) ? v : n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  }
+
+  function formatDate(iso) {
+    try {
+      return new Date(iso).toLocaleString(undefined, {
+        month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+        timeZoneName: 'short'
+      });
+    } catch { return iso; }
+  }
+
+  function showError(msg) {
+    document.getElementById('loading').style.display = 'none';
+    const banner = document.getElementById('error-banner');
+    banner.style.display = 'block';
+    banner.textContent   = '⚠️  ' + msg;
+    // Still show the app shell so filters are visible
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('grid').innerHTML = `<div class="empty">
+      <span class="icon">⚠️</span>
+      <p>Could not load signals. ${msg}</p>
+      <p style="margin-top:0.5rem;font-size:0.8rem">
+        The signals.json file is generated by the GitHub Actions workflow.<br>
+        Check that the workflow has run at least once.
+      </p>
+    </div>`;
+  }
+
+  // ── Bootstrap ──────────────────────────────────────────────────────────────
+  loadSignals();
+
+  // Auto-refresh every 5 minutes
+  setInterval(loadSignals, 5 * 60 * 1000);
+</script>
+</body>
+</html>
